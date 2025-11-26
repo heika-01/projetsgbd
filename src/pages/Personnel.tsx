@@ -1,5 +1,8 @@
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
+import { useForm } from "react-hook-form";
+import { zodResolver } from "@hookform/resolvers/zod";
+import * as z from "zod";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -12,14 +15,73 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
+import {
+  Form,
+  FormControl,
+  FormField,
+  FormItem,
+  FormLabel,
+  FormMessage,
+} from "@/components/ui/form";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import { ArrowLeft, Plus, Search, Edit, Trash2, UserCog, Shield } from "lucide-react";
+import { useToast } from "@/hooks/use-toast";
+
+const personnelSchema = z.object({
+  idpers: z.string().min(1, "ID obligatoire"),
+  nompers: z.string().min(2, "Nom minimum 2 caractères"),
+  prenonpers: z.string().min(2, "Prénom minimum 2 caractères"),
+  adrpers: z.string().min(5, "Adresse minimum 5 caractères"),
+  villepers: z.string().min(2, "Ville obligatoire"),
+  telpers: z.string().regex(/^0[1-9]\d{8}$/, "Format: 0123456789"),
+  d_embauche: z.string().min(1, "Date obligatoire"),
+  Login: z.string().min(3, "Login minimum 3 caractères"),
+  codeposte: z.string().min(1, "Poste obligatoire"),
+});
 
 const Personnel = () => {
   const navigate = useNavigate();
+  const { toast } = useToast();
   const [searchTerm, setSearchTerm] = useState("");
+  const [isDialogOpen, setIsDialogOpen] = useState(false);
+
+  const postes = [
+    { code: "P001", libelle: "Administrateur" },
+    { code: "P002", libelle: "Magasinier" },
+    { code: "P003", libelle: "Livreur" },
+    { code: "P004", libelle: "Chef Livreur" },
+  ];
+
+  const form = useForm<z.infer<typeof personnelSchema>>({
+    resolver: zodResolver(personnelSchema),
+    defaultValues: {
+      idpers: "",
+      nompers: "",
+      prenonpers: "",
+      adrpers: "",
+      villepers: "",
+      telpers: "",
+      d_embauche: new Date().toISOString().split('T')[0],
+      Login: "",
+      codeposte: "",
+    },
+  });
 
   // Données simulées
-  const personnel = [
+  const [personnel, setPersonnel] = useState([
     {
       idpers: "PER001",
       nompers: "Administrateur",
@@ -68,7 +130,7 @@ const Personnel = () => {
       codeposte: "P004",
       libellePoste: "Chef Livreur",
     },
-  ];
+  ]);
 
   const filteredPersonnel = personnel.filter(
     (pers) =>
@@ -94,6 +156,34 @@ const Personnel = () => {
     }
   };
 
+  const onSubmit = (data: z.infer<typeof personnelSchema>) => {
+    if (personnel.some(p => p.idpers === data.idpers)) {
+      toast({
+        title: "Erreur",
+        description: "Cet ID existe déjà",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    const posteInfo = postes.find(p => p.code === data.codeposte);
+    setPersonnel([...personnel, { ...data, libellePoste: posteInfo?.libelle || "" } as any]);
+    toast({
+      title: "Employé ajouté",
+      description: `${data.prenonpers} ${data.nompers} a été ajouté`,
+    });
+    setIsDialogOpen(false);
+    form.reset();
+  };
+
+  const handleDelete = (idpers: string) => {
+    setPersonnel(personnel.filter(p => p.idpers !== idpers));
+    toast({
+      title: "Employé supprimé",
+      description: "L'employé a été supprimé",
+    });
+  };
+
   return (
     <div className="min-h-screen bg-background">
       <header className="bg-card border-b border-border sticky top-0 z-50 shadow-sm">
@@ -105,7 +195,7 @@ const Personnel = () => {
             <UserCog className="h-6 w-6 text-primary" />
             <h1 className="text-2xl font-bold text-foreground">Gestion du Personnel</h1>
           </div>
-          <Button>
+          <Button onClick={() => setIsDialogOpen(true)}>
             <Plus className="h-4 w-4 mr-2" />
             Nouvel Employé
           </Button>
@@ -205,7 +295,7 @@ const Personnel = () => {
                         <Button variant="ghost" size="sm">
                           <Edit className="h-4 w-4" />
                         </Button>
-                        <Button variant="ghost" size="sm">
+                        <Button variant="ghost" size="sm" onClick={() => handleDelete(pers.idpers)}>
                           <Trash2 className="h-4 w-4 text-destructive" />
                         </Button>
                       </div>
@@ -229,6 +319,163 @@ const Personnel = () => {
           </CardContent>
         </Card>
       </main>
+
+      <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
+        <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle>Nouvel Employé</DialogTitle>
+            <DialogDescription>
+              Ajouter un nouvel employé au personnel
+            </DialogDescription>
+          </DialogHeader>
+          <Form {...form}>
+            <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
+              <div className="grid grid-cols-2 gap-4">
+                <FormField
+                  control={form.control}
+                  name="idpers"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>ID Personnel</FormLabel>
+                      <FormControl>
+                        <Input placeholder="PER001" {...field} />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+                <FormField
+                  control={form.control}
+                  name="Login"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Login</FormLabel>
+                      <FormControl>
+                        <Input placeholder="jdupont" {...field} />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+              </div>
+              <div className="grid grid-cols-2 gap-4">
+                <FormField
+                  control={form.control}
+                  name="nompers"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Nom</FormLabel>
+                      <FormControl>
+                        <Input placeholder="Dupont" {...field} />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+                <FormField
+                  control={form.control}
+                  name="prenonpers"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Prénom</FormLabel>
+                      <FormControl>
+                        <Input placeholder="Jean" {...field} />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+              </div>
+              <FormField
+                control={form.control}
+                name="adrpers"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Adresse</FormLabel>
+                    <FormControl>
+                      <Input placeholder="15 Rue de la Paix" {...field} />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+              <div className="grid grid-cols-2 gap-4">
+                <FormField
+                  control={form.control}
+                  name="villepers"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Ville</FormLabel>
+                      <FormControl>
+                        <Input placeholder="Paris" {...field} />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+                <FormField
+                  control={form.control}
+                  name="telpers"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Téléphone</FormLabel>
+                      <FormControl>
+                        <Input placeholder="0123456789" {...field} />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+              </div>
+              <div className="grid grid-cols-2 gap-4">
+                <FormField
+                  control={form.control}
+                  name="d_embauche"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Date Embauche</FormLabel>
+                      <FormControl>
+                        <Input type="date" {...field} />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+                <FormField
+                  control={form.control}
+                  name="codeposte"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Poste</FormLabel>
+                      <Select onValueChange={field.onChange} defaultValue={field.value}>
+                        <FormControl>
+                          <SelectTrigger>
+                            <SelectValue placeholder="Sélectionner un poste" />
+                          </SelectTrigger>
+                        </FormControl>
+                        <SelectContent>
+                          {postes.map((poste) => (
+                            <SelectItem key={poste.code} value={poste.code}>
+                              {poste.libelle}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+              </div>
+              <div className="flex justify-end gap-2">
+                <Button type="button" variant="outline" onClick={() => setIsDialogOpen(false)}>
+                  Annuler
+                </Button>
+                <Button type="submit">Ajouter</Button>
+              </div>
+            </form>
+          </Form>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 };

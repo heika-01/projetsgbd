@@ -1,5 +1,8 @@
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
+import { useForm } from "react-hook-form";
+import { zodResolver } from "@hookform/resolvers/zod";
+import * as z from "zod";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -12,14 +15,58 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
+import {
+  Form,
+  FormControl,
+  FormField,
+  FormItem,
+  FormLabel,
+  FormMessage,
+} from "@/components/ui/form";
 import { ArrowLeft, Plus, Search, Edit, Trash2, Package } from "lucide-react";
+import { useToast } from "@/hooks/use-toast";
+
+const articleSchema = z.object({
+  refart: z.string().min(1, "Référence obligatoire"),
+  designation: z.string().min(3, "Désignation minimum 3 caractères"),
+  prixA: z.coerce.number().positive("Prix achat doit être positif"),
+  prixV: z.coerce.number().positive("Prix vente doit être positif"),
+  codetva: z.coerce.number().min(0).max(100, "TVA entre 0 et 100"),
+  categorie: z.string().min(1, "Catégorie obligatoire"),
+  qtestk: z.coerce.number().min(0, "Quantité ne peut être négative"),
+}).refine((data) => data.prixV > data.prixA, {
+  message: "Le prix de vente doit être supérieur au prix d'achat",
+  path: ["prixV"],
+});
 
 const Articles = () => {
   const navigate = useNavigate();
+  const { toast } = useToast();
   const [searchTerm, setSearchTerm] = useState("");
+  const [isDialogOpen, setIsDialogOpen] = useState(false);
+
+  const form = useForm<z.infer<typeof articleSchema>>({
+    resolver: zodResolver(articleSchema),
+    defaultValues: {
+      refart: "",
+      designation: "",
+      prixA: 0,
+      prixV: 0,
+      codetva: 20,
+      categorie: "",
+      qtestk: 0,
+    },
+  });
 
   // Données simulées
-  const articles = [
+  const [articles, setArticles] = useState([
     {
       refart: "ART001",
       designation: "Ordinateur Portable HP",
@@ -60,7 +107,7 @@ const Articles = () => {
       qtestk: 25,
       supp: false,
     },
-  ];
+  ]);
 
   const filteredArticles = articles.filter(
     (art) =>
@@ -75,6 +122,33 @@ const Articles = () => {
     return <Badge className="bg-success text-success-foreground">En Stock</Badge>;
   };
 
+  const onSubmit = (data: z.infer<typeof articleSchema>) => {
+    if (articles.some(a => a.refart === data.refart)) {
+      toast({
+        title: "Erreur",
+        description: "Cette référence existe déjà",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    setArticles([...articles, { ...data, supp: false } as any]);
+    toast({
+      title: "Article ajouté",
+      description: `${data.designation} a été ajouté avec succès`,
+    });
+    setIsDialogOpen(false);
+    form.reset();
+  };
+
+  const handleDelete = (refart: string) => {
+    setArticles(articles.filter(a => a.refart !== refart));
+    toast({
+      title: "Article supprimé",
+      description: "L'article a été supprimé",
+    });
+  };
+
   return (
     <div className="min-h-screen bg-background">
       <header className="bg-card border-b border-border sticky top-0 z-50 shadow-sm">
@@ -86,7 +160,7 @@ const Articles = () => {
             <Package className="h-6 w-6 text-primary" />
             <h1 className="text-2xl font-bold text-foreground">Gestion des Articles</h1>
           </div>
-          <Button>
+          <Button onClick={() => setIsDialogOpen(true)}>
             <Plus className="h-4 w-4 mr-2" />
             Nouvel Article
           </Button>
@@ -181,7 +255,7 @@ const Articles = () => {
                         <Button variant="ghost" size="sm">
                           <Edit className="h-4 w-4" />
                         </Button>
-                        <Button variant="ghost" size="sm">
+                        <Button variant="ghost" size="sm" onClick={() => handleDelete(article.refart)}>
                           <Trash2 className="h-4 w-4 text-destructive" />
                         </Button>
                       </div>
@@ -206,6 +280,122 @@ const Articles = () => {
           </CardContent>
         </Card>
       </main>
+
+      <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
+        <DialogContent className="max-w-2xl">
+          <DialogHeader>
+            <DialogTitle>Nouvel Article</DialogTitle>
+            <DialogDescription>
+              Ajouter un nouvel article au catalogue
+            </DialogDescription>
+          </DialogHeader>
+          <Form {...form}>
+            <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
+              <div className="grid grid-cols-2 gap-4">
+                <FormField
+                  control={form.control}
+                  name="refart"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Référence</FormLabel>
+                      <FormControl>
+                        <Input placeholder="ART001" {...field} />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+                <FormField
+                  control={form.control}
+                  name="categorie"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Catégorie</FormLabel>
+                      <FormControl>
+                        <Input placeholder="Informatique" {...field} />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+              </div>
+              <FormField
+                control={form.control}
+                name="designation"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Désignation</FormLabel>
+                    <FormControl>
+                      <Input placeholder="Ordinateur Portable HP" {...field} />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+              <div className="grid grid-cols-3 gap-4">
+                <FormField
+                  control={form.control}
+                  name="prixA"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Prix Achat (€)</FormLabel>
+                      <FormControl>
+                        <Input type="number" step="0.01" {...field} />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+                <FormField
+                  control={form.control}
+                  name="prixV"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Prix Vente (€)</FormLabel>
+                      <FormControl>
+                        <Input type="number" step="0.01" {...field} />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+                <FormField
+                  control={form.control}
+                  name="codetva"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>TVA (%)</FormLabel>
+                      <FormControl>
+                        <Input type="number" {...field} />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+              </div>
+              <FormField
+                control={form.control}
+                name="qtestk"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Quantité en Stock</FormLabel>
+                    <FormControl>
+                      <Input type="number" {...field} />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+              <div className="flex justify-end gap-2">
+                <Button type="button" variant="outline" onClick={() => setIsDialogOpen(false)}>
+                  Annuler
+                </Button>
+                <Button type="submit">Ajouter</Button>
+              </div>
+            </form>
+          </Form>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 };
