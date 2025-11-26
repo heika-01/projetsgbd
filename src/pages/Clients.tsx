@@ -1,5 +1,8 @@
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
+import { useForm } from "react-hook-form";
+import { zodResolver } from "@hookform/resolvers/zod";
+import * as z from "zod";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -11,14 +14,55 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
+import {
+  Form,
+  FormControl,
+  FormField,
+  FormItem,
+  FormLabel,
+  FormMessage,
+} from "@/components/ui/form";
 import { ArrowLeft, Plus, Search, Edit, Trash2, Users, Mail, Phone } from "lucide-react";
+import { useToast } from "@/hooks/use-toast";
+
+const clientSchema = z.object({
+  noclt: z.string().min(1, "Numéro client obligatoire"),
+  nomclt: z.string().min(2, "Nom minimum 2 caractères"),
+  prenomclt: z.string().optional(),
+  adrclt: z.string().min(5, "Adresse minimum 5 caractères"),
+  code_postal: z.string().regex(/^\d{5}$/, "Code postal invalide (5 chiffres)"),
+  telclt: z.string().regex(/^0[1-9]\d{8}$/, "Format: 0123456789"),
+  adrmail: z.string().email("Email invalide"),
+});
 
 const Clients = () => {
   const navigate = useNavigate();
+  const { toast } = useToast();
   const [searchTerm, setSearchTerm] = useState("");
+  const [isDialogOpen, setIsDialogOpen] = useState(false);
+
+  const form = useForm<z.infer<typeof clientSchema>>({
+    resolver: zodResolver(clientSchema),
+    defaultValues: {
+      noclt: "",
+      nomclt: "",
+      prenomclt: "",
+      adrclt: "",
+      code_postal: "",
+      telclt: "",
+      adrmail: "",
+    },
+  });
 
   // Données simulées
-  const clients = [
+  const [clients, setClients] = useState([
     {
       noclt: "CLT001",
       nomclt: "Dupont",
@@ -55,7 +99,7 @@ const Clients = () => {
       telclt: "0178901234",
       adrmail: "contact@techcorp.fr",
     },
-  ];
+  ]);
 
   const filteredClients = clients.filter(
     (client) =>
@@ -65,6 +109,33 @@ const Clients = () => {
       client.adrmail.toLowerCase().includes(searchTerm.toLowerCase()) ||
       client.code_postal.includes(searchTerm)
   );
+
+  const onSubmit = (data: z.infer<typeof clientSchema>) => {
+    if (clients.some(c => c.noclt === data.noclt)) {
+      toast({
+        title: "Erreur",
+        description: "Ce numéro client existe déjà",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    setClients([...clients, data as any]);
+    toast({
+      title: "Client ajouté",
+      description: `${data.nomclt} ${data.prenomclt || ''} a été ajouté`,
+    });
+    setIsDialogOpen(false);
+    form.reset();
+  };
+
+  const handleDelete = (noclt: string) => {
+    setClients(clients.filter(c => c.noclt !== noclt));
+    toast({
+      title: "Client supprimé",
+      description: "Le client a été supprimé",
+    });
+  };
 
   return (
     <div className="min-h-screen bg-background">
@@ -77,7 +148,7 @@ const Clients = () => {
             <Users className="h-6 w-6 text-primary" />
             <h1 className="text-2xl font-bold text-foreground">Gestion des Clients</h1>
           </div>
-          <Button>
+          <Button onClick={() => setIsDialogOpen(true)}>
             <Plus className="h-4 w-4 mr-2" />
             Nouveau Client
           </Button>
@@ -168,7 +239,7 @@ const Clients = () => {
                         <Button variant="ghost" size="sm">
                           <Edit className="h-4 w-4" />
                         </Button>
-                        <Button variant="ghost" size="sm">
+                        <Button variant="ghost" size="sm" onClick={() => handleDelete(client.noclt)}>
                           <Trash2 className="h-4 w-4 text-destructive" />
                         </Button>
                       </div>
@@ -192,6 +263,122 @@ const Clients = () => {
           </CardContent>
         </Card>
       </main>
+
+      <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
+        <DialogContent className="max-w-2xl">
+          <DialogHeader>
+            <DialogTitle>Nouveau Client</DialogTitle>
+            <DialogDescription>
+              Ajouter un nouveau client (personne physique ou morale)
+            </DialogDescription>
+          </DialogHeader>
+          <Form {...form}>
+            <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
+              <FormField
+                control={form.control}
+                name="noclt"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Numéro Client</FormLabel>
+                    <FormControl>
+                      <Input placeholder="CLT001" {...field} />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+              <div className="grid grid-cols-2 gap-4">
+                <FormField
+                  control={form.control}
+                  name="nomclt"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Nom / Raison Sociale</FormLabel>
+                      <FormControl>
+                        <Input placeholder="Dupont ou SARL TechCorp" {...field} />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+                <FormField
+                  control={form.control}
+                  name="prenomclt"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Prénom (optionnel)</FormLabel>
+                      <FormControl>
+                        <Input placeholder="Jean" {...field} />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+              </div>
+              <FormField
+                control={form.control}
+                name="adrclt"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Adresse</FormLabel>
+                    <FormControl>
+                      <Input placeholder="15 Rue de la Paix" {...field} />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+              <div className="grid grid-cols-2 gap-4">
+                <FormField
+                  control={form.control}
+                  name="code_postal"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Code Postal</FormLabel>
+                      <FormControl>
+                        <Input placeholder="75001" {...field} />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+                <FormField
+                  control={form.control}
+                  name="telclt"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Téléphone</FormLabel>
+                      <FormControl>
+                        <Input placeholder="0145678901" {...field} />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+              </div>
+              <FormField
+                control={form.control}
+                name="adrmail"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Email</FormLabel>
+                    <FormControl>
+                      <Input type="email" placeholder="client@email.com" {...field} />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+              <div className="flex justify-end gap-2">
+                <Button type="button" variant="outline" onClick={() => setIsDialogOpen(false)}>
+                  Annuler
+                </Button>
+                <Button type="submit">Ajouter</Button>
+              </div>
+            </form>
+          </Form>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 };

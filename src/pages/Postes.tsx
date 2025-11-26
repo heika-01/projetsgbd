@@ -1,5 +1,8 @@
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
+import { useForm } from "react-hook-form";
+import { zodResolver } from "@hookform/resolvers/zod";
+import * as z from "zod";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -12,14 +15,49 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
+import {
+  Form,
+  FormControl,
+  FormField,
+  FormItem,
+  FormLabel,
+  FormMessage,
+} from "@/components/ui/form";
 import { ArrowLeft, Plus, Search, Edit, Trash2, Briefcase } from "lucide-react";
+import { useToast } from "@/hooks/use-toast";
+
+const posteSchema = z.object({
+  codeposte: z.string().min(1, "Code obligatoire"),
+  libelle: z.string().min(3, "Libellé minimum 3 caractères"),
+  indice: z.coerce.number().min(100, "Indice minimum 100").max(1000, "Indice maximum 1000"),
+  description: z.string().min(5, "Description minimum 5 caractères"),
+});
 
 const Postes = () => {
   const navigate = useNavigate();
+  const { toast } = useToast();
   const [searchTerm, setSearchTerm] = useState("");
+  const [isDialogOpen, setIsDialogOpen] = useState(false);
+
+  const form = useForm<z.infer<typeof posteSchema>>({
+    resolver: zodResolver(posteSchema),
+    defaultValues: {
+      codeposte: "",
+      libelle: "",
+      indice: 250,
+      description: "",
+    },
+  });
 
   // Données simulées
-  const postes = [
+  const [postes, setPostes] = useState([
     {
       codeposte: "P001",
       libelle: "Administrateur",
@@ -48,7 +86,7 @@ const Postes = () => {
       description: "Coordination des livraisons",
       nbEmployes: 5,
     },
-  ];
+  ]);
 
   const filteredPostes = postes.filter(
     (poste) =>
@@ -62,6 +100,42 @@ const Postes = () => {
     return <Badge className="bg-info text-info-foreground">Base</Badge>;
   };
 
+  const onSubmit = (data: z.infer<typeof posteSchema>) => {
+    if (postes.some(p => p.codeposte === data.codeposte)) {
+      toast({
+        title: "Erreur",
+        description: "Ce code poste existe déjà",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    setPostes([...postes, { ...data, nbEmployes: 0 } as any]);
+    toast({
+      title: "Poste ajouté",
+      description: `${data.libelle} a été ajouté`,
+    });
+    setIsDialogOpen(false);
+    form.reset();
+  };
+
+  const handleDelete = (codeposte: string) => {
+    const poste = postes.find(p => p.codeposte === codeposte);
+    if (poste && poste.nbEmployes > 0) {
+      toast({
+        title: "Suppression impossible",
+        description: "Ce poste a des employés associés",
+        variant: "destructive",
+      });
+      return;
+    }
+    setPostes(postes.filter(p => p.codeposte !== codeposte));
+    toast({
+      title: "Poste supprimé",
+      description: "Le poste a été supprimé",
+    });
+  };
+
   return (
     <div className="min-h-screen bg-background">
       <header className="bg-card border-b border-border sticky top-0 z-50 shadow-sm">
@@ -73,7 +147,7 @@ const Postes = () => {
             <Briefcase className="h-6 w-6 text-primary" />
             <h1 className="text-2xl font-bold text-foreground">Gestion des Postes</h1>
           </div>
-          <Button>
+          <Button onClick={() => setIsDialogOpen(true)}>
             <Plus className="h-4 w-4 mr-2" />
             Nouveau Poste
           </Button>
@@ -155,7 +229,12 @@ const Postes = () => {
                         <Button variant="ghost" size="sm">
                           <Edit className="h-4 w-4" />
                         </Button>
-                        <Button variant="ghost" size="sm" disabled={poste.nbEmployes > 0}>
+                        <Button 
+                          variant="ghost" 
+                          size="sm" 
+                          disabled={poste.nbEmployes > 0}
+                          onClick={() => handleDelete(poste.codeposte)}
+                        >
                           <Trash2 className="h-4 w-4 text-destructive" />
                         </Button>
                       </div>
@@ -218,6 +297,81 @@ const Postes = () => {
           </Card>
         </div>
       </main>
+
+      <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
+        <DialogContent className="max-w-xl">
+          <DialogHeader>
+            <DialogTitle>Nouveau Poste</DialogTitle>
+            <DialogDescription>
+              Définir un nouveau poste dans l'entreprise
+            </DialogDescription>
+          </DialogHeader>
+          <Form {...form}>
+            <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
+              <div className="grid grid-cols-2 gap-4">
+                <FormField
+                  control={form.control}
+                  name="codeposte"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Code Poste</FormLabel>
+                      <FormControl>
+                        <Input placeholder="P005" {...field} />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+                <FormField
+                  control={form.control}
+                  name="indice"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Indice</FormLabel>
+                      <FormControl>
+                        <Input type="number" {...field} />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+              </div>
+              <FormField
+                control={form.control}
+                name="libelle"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Libellé</FormLabel>
+                    <FormControl>
+                      <Input placeholder="Responsable Logistique" {...field} />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+              <FormField
+                control={form.control}
+                name="description"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Description</FormLabel>
+                    <FormControl>
+                      <Input placeholder="Gestion de la logistique et des livraisons" {...field} />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+              <div className="flex justify-end gap-2">
+                <Button type="button" variant="outline" onClick={() => setIsDialogOpen(false)}>
+                  Annuler
+                </Button>
+                <Button type="submit">Ajouter</Button>
+              </div>
+            </form>
+          </Form>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 };
