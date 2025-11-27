@@ -1,5 +1,8 @@
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
+import { useForm } from "react-hook-form";
+import { zodResolver } from "@hookform/resolvers/zod";
+import * as z from "zod";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -12,14 +15,72 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
+import { Label } from "@/components/ui/label";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import {
+  Form,
+  FormControl,
+  FormField,
+  FormItem,
+  FormLabel,
+  FormMessage,
+} from "@/components/ui/form";
 import { ArrowLeft, Plus, Search, Edit, Trash2, Truck } from "lucide-react";
+import { useToast } from "@/hooks/use-toast";
+
+const livraisonSchema = z.object({
+  nocde: z.string().min(1, "Sélectionnez une commande"),
+  dateliv: z.string().min(1, "Date requise"),
+  livreur: z.string().min(1, "Sélectionnez un livreur"),
+  modepay: z.string().min(1, "Mode de paiement requis"),
+});
 
 const Livraisons = () => {
   const navigate = useNavigate();
+  const { toast } = useToast();
   const [searchTerm, setSearchTerm] = useState("");
+  const [isDialogOpen, setIsDialogOpen] = useState(false);
+
+  const form = useForm<z.infer<typeof livraisonSchema>>({
+    resolver: zodResolver(livraisonSchema),
+    defaultValues: {
+      nocde: "",
+      dateliv: new Date().toISOString().split('T')[0],
+      livreur: "",
+      modepay: "",
+    },
+  });
+
+  // Commandes "Prêtes" disponibles (simulées)
+  const commandesPretes = [
+    { nocde: "CMD004", client: "Leroux Paul", ville: "75003" },
+    { nocde: "CMD005", client: "Petit Claire", ville: "75004" },
+  ];
+
+  // Livreurs disponibles (simulés)
+  const livreurs = [
+    { id: "LIV001", nom: "Pierre Martin" },
+    { id: "LIV002", nom: "Jean Dubois" },
+    { id: "LIV003", nom: "Marc Durand" },
+  ];
+
+  const modesPaiement = ["CB", "Espèces", "Chèque", "Virement"];
 
   // Données simulées
-  const livraisons = [
+  const [livraisons, setLivraisons] = useState([
     {
       nocde: "CMD001",
       client: "Dupont Jean",
@@ -47,7 +108,54 @@ const Livraisons = () => {
       modepay: "Chèque",
       etaliv: "Planifiée",
     },
-  ];
+  ]);
+
+  const onSubmit = (data: z.infer<typeof livraisonSchema>) => {
+    const commande = commandesPretes.find(c => c.nocde === data.nocde);
+    const livreurNom = livreurs.find(l => l.id === data.livreur)?.nom || "";
+    
+    // Vérifier la contrainte des 15 livraisons max par livreur/jour/ville
+    const livraisonsJour = livraisons.filter(
+      l => l.dateliv === data.dateliv && 
+           l.livreur === livreurNom && 
+           l.ville === commande?.ville
+    );
+
+    if (livraisonsJour.length >= 15) {
+      toast({
+        title: "Limite atteinte",
+        description: `Maximum 15 livraisons par jour/livreur/ville dépassé`,
+        variant: "destructive",
+      });
+      return;
+    }
+
+    const newLivraison = {
+      nocde: data.nocde,
+      client: commande?.client || "",
+      dateliv: data.dateliv,
+      livreur: livreurNom,
+      ville: commande?.ville || "",
+      modepay: data.modepay,
+      etaliv: "Planifiée",
+    };
+
+    setLivraisons([...livraisons, newLivraison] as any);
+    toast({
+      title: "Livraison planifiée",
+      description: `Livraison ${newLivraison.nocde} ajoutée avec succès`,
+    });
+    setIsDialogOpen(false);
+    form.reset();
+  };
+
+  const handleDelete = (nocde: string) => {
+    setLivraisons(livraisons.filter(liv => liv.nocde !== nocde));
+    toast({
+      title: "Livraison annulée",
+      description: "La livraison a été annulée avec succès",
+    });
+  };
 
   const getEtatColor = (etat: string) => {
     switch (etat) {
@@ -81,7 +189,7 @@ const Livraisons = () => {
             <Truck className="h-6 w-6 text-primary" />
             <h1 className="text-2xl font-bold text-foreground">Gestion des Livraisons</h1>
           </div>
-          <Button>
+          <Button onClick={() => setIsDialogOpen(true)}>
             <Plus className="h-4 w-4 mr-2" />
             Nouvelle Livraison
           </Button>
@@ -169,7 +277,11 @@ const Livraisons = () => {
                         <Button variant="ghost" size="sm">
                           <Edit className="h-4 w-4" />
                         </Button>
-                        <Button variant="ghost" size="sm">
+                        <Button 
+                          variant="ghost" 
+                          size="sm"
+                          onClick={() => handleDelete(livraison.nocde)}
+                        >
                           <Trash2 className="h-4 w-4 text-destructive" />
                         </Button>
                       </div>
@@ -180,6 +292,117 @@ const Livraisons = () => {
             </Table>
           </CardContent>
         </Card>
+
+        {/* Dialog d'ajout */}
+        <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
+          <DialogContent>
+            <DialogHeader>
+              <DialogTitle>Nouvelle Livraison</DialogTitle>
+              <DialogDescription>
+                Planifier une nouvelle livraison (seules les commandes "Prêtes" sont disponibles)
+              </DialogDescription>
+            </DialogHeader>
+            <Form {...form}>
+              <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
+                <FormField
+                  control={form.control}
+                  name="nocde"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Commande *</FormLabel>
+                      <Select onValueChange={field.onChange} value={field.value}>
+                        <FormControl>
+                          <SelectTrigger>
+                            <SelectValue placeholder="Sélectionner une commande prête" />
+                          </SelectTrigger>
+                        </FormControl>
+                        <SelectContent>
+                          {commandesPretes.map((cmd) => (
+                            <SelectItem key={cmd.nocde} value={cmd.nocde}>
+                              {cmd.nocde} - {cmd.client} ({cmd.ville})
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+                <FormField
+                  control={form.control}
+                  name="dateliv"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Date de Livraison *</FormLabel>
+                      <FormControl>
+                        <Input type="date" {...field} />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+                <FormField
+                  control={form.control}
+                  name="livreur"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Livreur *</FormLabel>
+                      <Select onValueChange={field.onChange} value={field.value}>
+                        <FormControl>
+                          <SelectTrigger>
+                            <SelectValue placeholder="Sélectionner un livreur" />
+                          </SelectTrigger>
+                        </FormControl>
+                        <SelectContent>
+                          {livreurs.map((liv) => (
+                            <SelectItem key={liv.id} value={liv.id}>
+                              {liv.nom}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+                <FormField
+                  control={form.control}
+                  name="modepay"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Mode de Paiement *</FormLabel>
+                      <Select onValueChange={field.onChange} value={field.value}>
+                        <FormControl>
+                          <SelectTrigger>
+                            <SelectValue placeholder="Sélectionner un mode" />
+                          </SelectTrigger>
+                        </FormControl>
+                        <SelectContent>
+                          {modesPaiement.map((mode) => (
+                            <SelectItem key={mode} value={mode}>
+                              {mode}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+                <div className="flex justify-end gap-2 pt-4">
+                  <Button
+                    type="button"
+                    variant="outline"
+                    onClick={() => setIsDialogOpen(false)}
+                  >
+                    Annuler
+                  </Button>
+                  <Button type="submit">Planifier la Livraison</Button>
+                </div>
+              </form>
+            </Form>
+          </DialogContent>
+        </Dialog>
 
         {/* Contraintes importantes */}
         <Card className="mt-6 border-warning">
