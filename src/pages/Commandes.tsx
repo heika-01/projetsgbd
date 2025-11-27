@@ -1,5 +1,8 @@
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
+import { useForm } from "react-hook-form";
+import { zodResolver } from "@hookform/resolvers/zod";
+import * as z from "zod";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -30,6 +33,19 @@ import {
 } from "@/components/ui/select";
 import { ArrowLeft, Plus, Search, Edit, Trash2 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
+import {
+  Form,
+  FormControl,
+  FormField,
+  FormItem,
+  FormLabel,
+  FormMessage,
+} from "@/components/ui/form";
+
+const commandeSchema = z.object({
+  noclt: z.string().min(1, "Sélectionnez un client"),
+  datecde: z.string().min(1, "Date requise"),
+});
 
 // États possibles: EC (En Cours), Pr (Prête), lI (Livrée), SO (Sortie), AN (Annulée), AL (Annulée Livrée)
 const etats = [
@@ -45,8 +61,24 @@ const Commandes = () => {
   const navigate = useNavigate();
   const { toast } = useToast();
   const [searchTerm, setSearchTerm] = useState("");
-  const [isDialogOpen, setIsDialogOpen] = useState(false);
+  const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
+  const [isAddDialogOpen, setIsAddDialogOpen] = useState(false);
   const [editingCommande, setEditingCommande] = useState<any>(null);
+
+  const form = useForm<z.infer<typeof commandeSchema>>({
+    resolver: zodResolver(commandeSchema),
+    defaultValues: {
+      noclt: "",
+      datecde: new Date().toISOString().split('T')[0],
+    },
+  });
+
+  // Liste des clients (simulée)
+  const clients = [
+    { noclt: "CLT001", nom: "Dupont Jean" },
+    { noclt: "CLT002", nom: "Martin Sophie" },
+    { noclt: "CLT003", nom: "Bernard Marie" },
+  ];
 
   // Données simulées
   const [commandes, setCommandes] = useState([
@@ -64,9 +96,28 @@ const Commandes = () => {
     return etats.find(e => e.value === etat)?.label || etat;
   };
 
+  const onSubmit = (data: z.infer<typeof commandeSchema>) => {
+    const client = clients.find(c => c.noclt === data.noclt);
+    const newCommande = {
+      nocde: `CMD${String(commandes.length + 1).padStart(3, '0')}`,
+      noclt: data.noclt,
+      nomClient: client?.nom || "",
+      datecde: data.datecde,
+      etatcde: "EC",
+    };
+
+    setCommandes([...commandes, newCommande] as any);
+    toast({
+      title: "Commande créée",
+      description: `Commande ${newCommande.nocde} ajoutée avec succès`,
+    });
+    setIsAddDialogOpen(false);
+    form.reset();
+  };
+
   const handleEdit = (commande: any) => {
     setEditingCommande(commande);
-    setIsDialogOpen(true);
+    setIsEditDialogOpen(true);
   };
 
   const handleSaveEdit = (newEtat: string) => {
@@ -90,7 +141,7 @@ const Commandes = () => {
         title: "Commande modifiée",
         description: `État changé de ${getEtatLabel(editingCommande.etatcde)} à ${getEtatLabel(newEtat)}`,
       });
-      setIsDialogOpen(false);
+      setIsEditDialogOpen(false);
       setEditingCommande(null);
     } else {
       toast({
@@ -125,7 +176,7 @@ const Commandes = () => {
             </Button>
             <h1 className="text-2xl font-bold text-foreground">Gestion des Commandes</h1>
           </div>
-          <Button>
+          <Button onClick={() => setIsAddDialogOpen(true)}>
             <Plus className="h-4 w-4 mr-2" />
             Nouvelle Commande
           </Button>
@@ -195,8 +246,71 @@ const Commandes = () => {
         </Card>
       </main>
 
+      {/* Dialog d'ajout */}
+      <Dialog open={isAddDialogOpen} onOpenChange={setIsAddDialogOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Nouvelle Commande</DialogTitle>
+            <DialogDescription>
+              Créer une nouvelle commande client
+            </DialogDescription>
+          </DialogHeader>
+          <Form {...form}>
+            <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
+              <FormField
+                control={form.control}
+                name="noclt"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Client *</FormLabel>
+                    <Select onValueChange={field.onChange} value={field.value}>
+                      <FormControl>
+                        <SelectTrigger>
+                          <SelectValue placeholder="Sélectionner un client" />
+                        </SelectTrigger>
+                      </FormControl>
+                      <SelectContent>
+                        {clients.map((client) => (
+                          <SelectItem key={client.noclt} value={client.noclt}>
+                            {client.nom} ({client.noclt})
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+              <FormField
+                control={form.control}
+                name="datecde"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Date de Commande *</FormLabel>
+                    <FormControl>
+                      <Input type="date" {...field} />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+              <div className="flex justify-end gap-2 pt-4">
+                <Button
+                  type="button"
+                  variant="outline"
+                  onClick={() => setIsAddDialogOpen(false)}
+                >
+                  Annuler
+                </Button>
+                <Button type="submit">Créer la Commande</Button>
+              </div>
+            </form>
+          </Form>
+        </DialogContent>
+      </Dialog>
+
       {/* Dialog de modification */}
-      <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
+      <Dialog open={isEditDialogOpen} onOpenChange={setIsEditDialogOpen}>
         <DialogContent>
           <DialogHeader>
             <DialogTitle>Modifier l'état de la commande</DialogTitle>
