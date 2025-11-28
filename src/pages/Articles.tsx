@@ -31,89 +31,45 @@ import {
   FormMessage,
 } from "@/components/ui/form";
 import { ArrowLeft, Plus, Search, Edit, Trash2, Package } from "lucide-react";
-import { useToast } from "@/hooks/use-toast";
+import { useArticles } from "@/hooks/useArticles";
 
 const articleSchema = z.object({
   refart: z.string().min(1, "Référence obligatoire"),
   designation: z.string().min(3, "Désignation minimum 3 caractères"),
-  prixA: z.coerce.number().positive("Prix achat doit être positif"),
-  prixV: z.coerce.number().positive("Prix vente doit être positif"),
+  prixa: z.coerce.number().positive("Prix achat doit être positif"),
+  prixv: z.coerce.number().positive("Prix vente doit être positif"),
   codetva: z.coerce.number().min(0).max(100, "TVA entre 0 et 100"),
   categorie: z.string().min(1, "Catégorie obligatoire"),
   qtestk: z.coerce.number().min(0, "Quantité ne peut être négative"),
-}).refine((data) => data.prixV > data.prixA, {
+}).refine((data) => data.prixv > data.prixa, {
   message: "Le prix de vente doit être supérieur au prix d'achat",
-  path: ["prixV"],
+  path: ["prixv"],
 });
 
 const Articles = () => {
   const navigate = useNavigate();
-  const { toast } = useToast();
   const [searchTerm, setSearchTerm] = useState("");
   const [isDialogOpen, setIsDialogOpen] = useState(false);
+  const { articles, isLoading, addArticle, deleteArticle } = useArticles();
 
   const form = useForm<z.infer<typeof articleSchema>>({
     resolver: zodResolver(articleSchema),
     defaultValues: {
       refart: "",
       designation: "",
-      prixA: 0,
-      prixV: 0,
+      prixa: 0,
+      prixv: 0,
       codetva: 20,
       categorie: "",
       qtestk: 0,
     },
   });
 
-  // Données simulées
-  const [articles, setArticles] = useState([
-    {
-      refart: "ART001",
-      designation: "Ordinateur Portable HP",
-      prixA: 450,
-      prixV: 699,
-      codetva: 20,
-      categorie: "Informatique",
-      qtestk: 15,
-      supp: false,
-    },
-    {
-      refart: "ART002",
-      designation: "Souris Sans Fil Logitech",
-      prixA: 15,
-      prixV: 29.99,
-      codetva: 20,
-      categorie: "Accessoires",
-      qtestk: 50,
-      supp: false,
-    },
-    {
-      refart: "ART003",
-      designation: "Écran LED 24 pouces",
-      prixA: 120,
-      prixV: 189,
-      codetva: 20,
-      categorie: "Informatique",
-      qtestk: 8,
-      supp: false,
-    },
-    {
-      refart: "ART004",
-      designation: "Clavier Mécanique RGB",
-      prixA: 45,
-      prixV: 79.99,
-      codetva: 20,
-      categorie: "Accessoires",
-      qtestk: 25,
-      supp: false,
-    },
-  ]);
-
   const filteredArticles = articles.filter(
     (art) =>
       art.refart.toLowerCase().includes(searchTerm.toLowerCase()) ||
       art.designation.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      art.categorie.toLowerCase().includes(searchTerm.toLowerCase())
+      (art.categorie && art.categorie.toLowerCase().includes(searchTerm.toLowerCase()))
   );
 
   const getStockBadge = (qte: number) => {
@@ -124,30 +80,29 @@ const Articles = () => {
 
   const onSubmit = (data: z.infer<typeof articleSchema>) => {
     if (articles.some(a => a.refart === data.refart)) {
-      toast({
-        title: "Erreur",
-        description: "Cette référence existe déjà",
-        variant: "destructive",
-      });
       return;
     }
 
-    setArticles([...articles, { ...data, supp: false } as any]);
-    toast({
-      title: "Article ajouté",
-      description: `${data.designation} a été ajouté avec succès`,
+    addArticle({
+      refart: data.refart,
+      designation: data.designation,
+      prixa: data.prixa,
+      prixv: data.prixv,
+      codetva: data.codetva,
+      categorie: data.categorie,
+      qtestk: data.qtestk,
     });
     setIsDialogOpen(false);
     form.reset();
   };
 
   const handleDelete = (refart: string) => {
-    setArticles(articles.filter(a => a.refart !== refart));
-    toast({
-      title: "Article supprimé",
-      description: "L'article a été supprimé",
-    });
+    deleteArticle(refart);
   };
+
+  if (isLoading) {
+    return <div className="min-h-screen bg-background flex items-center justify-center">Chargement...</div>;
+  }
 
   return (
     <div className="min-h-screen bg-background">
@@ -242,14 +197,14 @@ const Articles = () => {
                   <TableRow key={article.refart}>
                     <TableCell className="font-medium">{article.refart}</TableCell>
                     <TableCell>{article.designation}</TableCell>
-                    <TableCell>{article.prixA.toFixed(2)} €</TableCell>
-                    <TableCell className="font-semibold">{article.prixV.toFixed(2)} €</TableCell>
+                    <TableCell>{article.prixa?.toFixed(2) || 0} €</TableCell>
+                    <TableCell className="font-semibold">{article.prixv?.toFixed(2) || 0} €</TableCell>
                     <TableCell>{article.codetva}%</TableCell>
                     <TableCell>
                       <Badge variant="outline">{article.categorie}</Badge>
                     </TableCell>
                     <TableCell>{article.qtestk}</TableCell>
-                    <TableCell>{getStockBadge(article.qtestk)}</TableCell>
+                    <TableCell>{getStockBadge(article.qtestk || 0)}</TableCell>
                     <TableCell className="text-right">
                       <div className="flex justify-end gap-2">
                         <Button variant="ghost" size="sm">
@@ -335,7 +290,7 @@ const Articles = () => {
               <div className="grid grid-cols-3 gap-4">
                 <FormField
                   control={form.control}
-                  name="prixA"
+                  name="prixa"
                   render={({ field }) => (
                     <FormItem>
                       <FormLabel>Prix Achat (€)</FormLabel>
@@ -348,7 +303,7 @@ const Articles = () => {
                 />
                 <FormField
                   control={form.control}
-                  name="prixV"
+                  name="prixv"
                   render={({ field }) => (
                     <FormItem>
                       <FormLabel>Prix Vente (€)</FormLabel>

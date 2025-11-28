@@ -30,112 +30,67 @@ import {
   FormMessage,
 } from "@/components/ui/form";
 import { ArrowLeft, Plus, Search, Edit, Trash2, Users, Mail, Phone } from "lucide-react";
-import { useToast } from "@/hooks/use-toast";
+import { useClients } from "@/hooks/useClients";
 
 const clientSchema = z.object({
-  noclt: z.string().min(1, "Numéro client obligatoire"),
   nomclt: z.string().min(2, "Nom minimum 2 caractères"),
   prenomclt: z.string().optional(),
   adrclt: z.string().min(5, "Adresse minimum 5 caractères"),
-  code_postal: z.string().regex(/^\d{5}$/, "Code postal invalide (5 chiffres)"),
-  telclt: z.string().regex(/^0[1-9]\d{8}$/, "Format: 0123456789"),
+  code_postal: z.coerce.number().int().positive(),
+  telclt: z.coerce.number().int().positive(),
   adrmail: z.string().email("Email invalide"),
+  villecit: z.string().optional(),
 });
 
 const Clients = () => {
   const navigate = useNavigate();
-  const { toast } = useToast();
   const [searchTerm, setSearchTerm] = useState("");
   const [isDialogOpen, setIsDialogOpen] = useState(false);
+  const { clients, isLoading, addClient, deleteClient } = useClients();
 
   const form = useForm<z.infer<typeof clientSchema>>({
     resolver: zodResolver(clientSchema),
     defaultValues: {
-      noclt: "",
       nomclt: "",
       prenomclt: "",
       adrclt: "",
-      code_postal: "",
-      telclt: "",
+      code_postal: 0,
+      telclt: 0,
       adrmail: "",
+      villecit: "",
     },
   });
 
-  // Données simulées
-  const [clients, setClients] = useState([
-    {
-      noclt: "CLT001",
-      nomclt: "Dupont",
-      prenomclt: "Jean",
-      adrclt: "15 Rue de la Paix",
-      code_postal: "75001",
-      telclt: "0145678901",
-      adrmail: "jean.dupont@email.com",
-    },
-    {
-      noclt: "CLT002",
-      nomclt: "Martin",
-      prenomclt: "Sophie",
-      adrclt: "28 Avenue des Champs",
-      code_postal: "75008",
-      telclt: "0156789012",
-      adrmail: "sophie.martin@email.com",
-    },
-    {
-      noclt: "CLT003",
-      nomclt: "Bernard",
-      prenomclt: "Marie",
-      adrclt: "42 Boulevard Haussmann",
-      code_postal: "75009",
-      telclt: "0167890123",
-      adrmail: "marie.bernard@email.com",
-    },
-    {
-      noclt: "CLT004",
-      nomclt: "SARL TechCorp",
-      prenomclt: "",
-      adrclt: "10 Rue du Commerce",
-      code_postal: "75015",
-      telclt: "0178901234",
-      adrmail: "contact@techcorp.fr",
-    },
-  ]);
-
   const filteredClients = clients.filter(
     (client) =>
-      client.noclt.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      String(client.noclt).toLowerCase().includes(searchTerm.toLowerCase()) ||
       client.nomclt.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      client.prenomclt.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      client.adrmail.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      client.code_postal.includes(searchTerm)
+      (client.prenomclt && client.prenomclt.toLowerCase().includes(searchTerm.toLowerCase())) ||
+      (client.adrmail && client.adrmail.toLowerCase().includes(searchTerm.toLowerCase())) ||
+      String(client.code_postal || '').includes(searchTerm)
   );
 
   const onSubmit = (data: z.infer<typeof clientSchema>) => {
-    if (clients.some(c => c.noclt === data.noclt)) {
-      toast({
-        title: "Erreur",
-        description: "Ce numéro client existe déjà",
-        variant: "destructive",
-      });
-      return;
-    }
-
-    setClients([...clients, data as any]);
-    toast({
-      title: "Client ajouté",
-      description: `${data.nomclt} ${data.prenomclt || ''} a été ajouté`,
+    addClient({
+      nomclt: data.nomclt,
+      prenomclt: data.prenomclt,
+      adrclt: data.adrclt,
+      code_postal: data.code_postal,
+      telclt: data.telclt,
+      adrmail: data.adrmail,
+      villecit: data.villecit,
     });
     setIsDialogOpen(false);
     form.reset();
   };
 
-  const handleDelete = (noclt: string) => {
-    setClients(clients.filter(c => c.noclt !== noclt));
-    toast({
-      title: "Client supprimé",
-      description: "Le client a été supprimé",
-    });
+  const handleDelete = (noclt: number) => {
+    deleteClient(noclt);
   };
+
+  if (isLoading) {
+    return <div className="min-h-screen bg-background flex items-center justify-center">Chargement...</div>;
+  }
 
   return (
     <div className="min-h-screen bg-background">
@@ -224,14 +179,14 @@ const Clients = () => {
                     <TableCell>{client.code_postal}</TableCell>
                     <TableCell>
                       <div className="flex flex-col gap-1 text-sm">
-                        <div className="flex items-center gap-1">
-                          <Phone className="h-3 w-3 text-muted-foreground" />
-                          <span>{client.telclt}</span>
-                        </div>
-                        <div className="flex items-center gap-1">
-                          <Mail className="h-3 w-3 text-muted-foreground" />
-                          <span className="text-xs">{client.adrmail}</span>
-                        </div>
+                         <div className="flex items-center gap-1">
+                           <Phone className="h-3 w-3 text-muted-foreground" />
+                           <span>{client.telclt || '-'}</span>
+                         </div>
+                         <div className="flex items-center gap-1">
+                           <Mail className="h-3 w-3 text-muted-foreground" />
+                           <span className="text-xs">{client.adrmail || '-'}</span>
+                         </div>
                       </div>
                     </TableCell>
                     <TableCell className="text-right">
@@ -272,21 +227,8 @@ const Clients = () => {
               Ajouter un nouveau client (personne physique ou morale)
             </DialogDescription>
           </DialogHeader>
-          <Form {...form}>
+           <Form {...form}>
             <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
-              <FormField
-                control={form.control}
-                name="noclt"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Numéro Client</FormLabel>
-                    <FormControl>
-                      <Input placeholder="CLT001" {...field} />
-                    </FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
               <div className="grid grid-cols-2 gap-4">
                 <FormField
                   control={form.control}
@@ -329,32 +271,32 @@ const Clients = () => {
                 )}
               />
               <div className="grid grid-cols-2 gap-4">
-                <FormField
-                  control={form.control}
-                  name="code_postal"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>Code Postal</FormLabel>
-                      <FormControl>
-                        <Input placeholder="75001" {...field} />
-                      </FormControl>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-                <FormField
-                  control={form.control}
-                  name="telclt"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>Téléphone</FormLabel>
-                      <FormControl>
-                        <Input placeholder="0145678901" {...field} />
-                      </FormControl>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
+                 <FormField
+                   control={form.control}
+                   name="code_postal"
+                   render={({ field }) => (
+                     <FormItem>
+                       <FormLabel>Code Postal</FormLabel>
+                       <FormControl>
+                         <Input type="number" placeholder="75001" {...field} />
+                       </FormControl>
+                       <FormMessage />
+                     </FormItem>
+                   )}
+                 />
+                 <FormField
+                   control={form.control}
+                   name="telclt"
+                   render={({ field }) => (
+                     <FormItem>
+                       <FormLabel>Téléphone</FormLabel>
+                       <FormControl>
+                         <Input type="number" placeholder="0145678901" {...field} />
+                       </FormControl>
+                       <FormMessage />
+                     </FormItem>
+                   )}
+                 />
               </div>
               <FormField
                 control={form.control}
