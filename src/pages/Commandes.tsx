@@ -3,6 +3,8 @@ import { useNavigate } from "react-router-dom";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import * as z from "zod";
+import { useCommandes } from "@/hooks/useCommandes";
+import { useClients } from "@/hooks/useClients";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -65,6 +67,9 @@ const Commandes = () => {
   const [isAddDialogOpen, setIsAddDialogOpen] = useState(false);
   const [editingCommande, setEditingCommande] = useState<any>(null);
 
+  const { commandes, isLoading, addCommande, updateCommande, deleteCommande } = useCommandes();
+  const { clients, isLoading: clientsLoading } = useClients();
+
   const form = useForm<z.infer<typeof commandeSchema>>({
     resolver: zodResolver(commandeSchema),
     defaultValues: {
@@ -72,21 +77,6 @@ const Commandes = () => {
       datecde: new Date().toISOString().split('T')[0],
     },
   });
-
-  // Liste des clients (simulée)
-  const clients = [
-    { noclt: "CLT001", nom: "Dupont Jean" },
-    { noclt: "CLT002", nom: "Martin Sophie" },
-    { noclt: "CLT003", nom: "Bernard Marie" },
-  ];
-
-  // Données simulées
-  const [commandes, setCommandes] = useState([
-    { nocde: "CMD001", noclt: "CLT001", nomClient: "Dupont Jean", datecde: "2025-11-20", etatcde: "EC" },
-    { nocde: "CMD002", noclt: "CLT002", nomClient: "Martin Sophie", datecde: "2025-11-21", etatcde: "Pr" },
-    { nocde: "CMD003", noclt: "CLT003", nomClient: "Bernard Marie", datecde: "2025-11-22", etatcde: "lI" },
-    { nocde: "CMD004", noclt: "CLT001", nomClient: "Dupont Jean", datecde: "2025-11-23", etatcde: "EC" },
-  ]);
 
   const getEtatColor = (etat: string) => {
     return etats.find(e => e.value === etat)?.color || "bg-gray-500";
@@ -97,20 +87,7 @@ const Commandes = () => {
   };
 
   const onSubmit = (data: z.infer<typeof commandeSchema>) => {
-    const client = clients.find(c => c.noclt === data.noclt);
-    const newCommande = {
-      nocde: `CMD${String(commandes.length + 1).padStart(3, '0')}`,
-      noclt: data.noclt,
-      nomClient: client?.nom || "",
-      datecde: data.datecde,
-      etatcde: "EC",
-    };
-
-    setCommandes([...commandes, newCommande] as any);
-    toast({
-      title: "Commande créée",
-      description: `Commande ${newCommande.nocde} ajoutée avec succès`,
-    });
+    addCommande({ noclt: Number(data.noclt), datecde: data.datecde, etatcde: "EC" });
     setIsAddDialogOpen(false);
     form.reset();
   };
@@ -121,50 +98,30 @@ const Commandes = () => {
   };
 
   const handleSaveEdit = (newEtat: string) => {
-    // Vérifier les transitions valides
-    const validTransitions: any = {
-      "EC": ["Pr", "AN"],
-      "Pr": ["lI", "SO", "AN", "AL"],
-      "lI": [],
-      "SO": [],
-      "AN": [],
-      "AL": []
-    };
-
-    if (editingCommande && validTransitions[editingCommande.etatcde].includes(newEtat)) {
-      setCommandes(commandes.map(cmd => 
-        cmd.nocde === editingCommande.nocde 
-          ? { ...cmd, etatcde: newEtat }
-          : cmd
-      ));
-      toast({
-        title: "Commande modifiée",
-        description: `État changé de ${getEtatLabel(editingCommande.etatcde)} à ${getEtatLabel(newEtat)}`,
-      });
+    if (editingCommande) {
+      updateCommande({ nocde: editingCommande.nocde, etatcde: newEtat });
       setIsEditDialogOpen(false);
       setEditingCommande(null);
-    } else {
-      toast({
-        title: "Transition invalide",
-        description: "Cette transition d'état n'est pas autorisée",
-        variant: "destructive",
-      });
     }
   };
 
   const handleDelete = (nocde: string) => {
-    setCommandes(commandes.filter(cmd => cmd.nocde !== nocde));
-    toast({
-      title: "Commande annulée",
-      description: "La commande a été annulée avec succès",
-    });
+    deleteCommande(Number(nocde));
   };
 
   const filteredCommandes = commandes.filter(cmd =>
-    cmd.nocde.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    cmd.nomClient.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    cmd.datecde.includes(searchTerm)
+    cmd.nocde.toString().includes(searchTerm) ||
+    (cmd.clients?.nomclt || "").toLowerCase().includes(searchTerm.toLowerCase()) ||
+    (cmd.datecde || "").includes(searchTerm)
   );
+
+  if (isLoading || clientsLoading) {
+    return (
+      <div className="min-h-screen bg-background flex items-center justify-center">
+        <p>Chargement...</p>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen bg-background">
@@ -213,11 +170,11 @@ const Commandes = () => {
                 {filteredCommandes.map((commande) => (
                   <TableRow key={commande.nocde}>
                     <TableCell className="font-medium">{commande.nocde}</TableCell>
-                    <TableCell>{commande.nomClient}</TableCell>
-                    <TableCell>{new Date(commande.datecde).toLocaleDateString('fr-FR')}</TableCell>
+                    <TableCell>{commande.clients ? `${commande.clients.nomclt} ${commande.clients.prenomclt || ""}` : "N/A"}</TableCell>
+                    <TableCell>{commande.datecde ? new Date(commande.datecde).toLocaleDateString('fr-FR') : "N/A"}</TableCell>
                     <TableCell>
-                      <Badge className={`${getEtatColor(commande.etatcde)} text-white`}>
-                        {getEtatLabel(commande.etatcde)}
+                      <Badge className={`${getEtatColor(commande.etatcde || "")} text-white`}>
+                        {getEtatLabel(commande.etatcde || "")}
                       </Badge>
                     </TableCell>
                     <TableCell className="text-right">
@@ -232,7 +189,7 @@ const Commandes = () => {
                         <Button
                           variant="ghost"
                           size="sm"
-                          onClick={() => handleDelete(commande.nocde)}
+                          onClick={() => handleDelete(commande.nocde.toString())}
                         >
                           <Trash2 className="h-4 w-4 text-destructive" />
                         </Button>
@@ -271,8 +228,8 @@ const Commandes = () => {
                       </FormControl>
                       <SelectContent>
                         {clients.map((client) => (
-                          <SelectItem key={client.noclt} value={client.noclt}>
-                            {client.nom} ({client.noclt})
+                          <SelectItem key={client.noclt} value={String(client.noclt)}>
+                            {client.nomclt} {client.prenomclt || ""} ({client.noclt})
                           </SelectItem>
                         ))}
                       </SelectContent>
