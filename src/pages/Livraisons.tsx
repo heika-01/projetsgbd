@@ -3,6 +3,9 @@ import { useNavigate } from "react-router-dom";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import * as z from "zod";
+import { useLivraisons } from "@/hooks/useLivraisons";
+import { useCommandes } from "@/hooks/useCommandes";
+import { usePersonnel } from "@/hooks/usePersonnel";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -54,6 +57,10 @@ const Livraisons = () => {
   const [searchTerm, setSearchTerm] = useState("");
   const [isDialogOpen, setIsDialogOpen] = useState(false);
 
+  const { livraisons, isLoading, addLivraison, deleteLivraison } = useLivraisons();
+  const { commandes, isLoading: commandesLoading } = useCommandes();
+  const { personnel, isLoading: personnelLoading } = usePersonnel();
+
   const form = useForm<z.infer<typeof livraisonSchema>>({
     resolver: zodResolver(livraisonSchema),
     defaultValues: {
@@ -64,119 +71,70 @@ const Livraisons = () => {
     },
   });
 
-  // Commandes "Prêtes" disponibles (simulées)
-  const commandesPretes = [
-    { nocde: "CMD004", client: "Leroux Paul", ville: "75003" },
-    { nocde: "CMD005", client: "Petit Claire", ville: "75004" },
-  ];
+  // Commandes "Prêtes" (état PR)
+  const commandesPretes = commandes.filter(c => c.etatcde === "PR");
 
-  // Livreurs disponibles (simulés)
-  const livreurs = [
-    { id: "LIV001", nom: "Pierre Martin" },
-    { id: "LIV002", nom: "Jean Dubois" },
-    { id: "LIV003", nom: "Marc Durand" },
-  ];
+  // Livreurs (personnel avec codeposte LIV)
+  const livreurs = personnel.filter(p => p.codeposte === "LIV");
 
-  const modesPaiement = ["CB", "Espèces", "Chèque", "Virement"];
-
-  // Données simulées
-  const [livraisons, setLivraisons] = useState([
-    {
-      nocde: "CMD001",
-      client: "Dupont Jean",
-      dateliv: "2025-11-26",
-      livreur: "Pierre Martin",
-      ville: "75001",
-      modepay: "CB",
-      etaliv: "En cours",
-    },
-    {
-      nocde: "CMD002",
-      client: "Martin Sophie",
-      dateliv: "2025-11-26",
-      livreur: "Jean Dubois",
-      ville: "75002",
-      modepay: "Espèces",
-      etaliv: "Livrée",
-    },
-    {
-      nocde: "CMD003",
-      client: "Bernard Marie",
-      dateliv: "2025-11-27",
-      livreur: "Pierre Martin",
-      ville: "75001",
-      modepay: "Chèque",
-      etaliv: "Planifiée",
-    },
-  ]);
+  const modesPaiement = ["avant_livraison", "apres_livraison"];
 
   const onSubmit = (data: z.infer<typeof livraisonSchema>) => {
-    const commande = commandesPretes.find(c => c.nocde === data.nocde);
-    const livreurNom = livreurs.find(l => l.id === data.livreur)?.nom || "";
-    
-    // Vérifier la contrainte des 15 livraisons max par livreur/jour/ville
-    const livraisonsJour = livraisons.filter(
-      l => l.dateliv === data.dateliv && 
-           l.livreur === livreurNom && 
-           l.ville === commande?.ville
-    );
-
-    if (livraisonsJour.length >= 15) {
-      toast({
-        title: "Limite atteinte",
-        description: `Maximum 15 livraisons par jour/livreur/ville dépassé`,
-        variant: "destructive",
-      });
-      return;
-    }
-
-    const newLivraison = {
-      nocde: data.nocde,
-      client: commande?.client || "",
-      dateliv: data.dateliv,
-      livreur: livreurNom,
-      ville: commande?.ville || "",
+    addLivraison({ 
+      nocde: Number(data.nocde), 
+      dateliv: data.dateliv, 
+      livreur: Number(data.livreur), 
       modepay: data.modepay,
-      etaliv: "Planifiée",
-    };
-
-    setLivraisons([...livraisons, newLivraison] as any);
-    toast({
-      title: "Livraison planifiée",
-      description: `Livraison ${newLivraison.nocde} ajoutée avec succès`,
+      etatliv: "EC"
     });
     setIsDialogOpen(false);
     form.reset();
   };
 
-  const handleDelete = (nocde: string) => {
-    setLivraisons(livraisons.filter(liv => liv.nocde !== nocde));
-    toast({
-      title: "Livraison annulée",
-      description: "La livraison a été annulée avec succès",
-    });
+  const handleDelete = (id: string) => {
+    deleteLivraison(id);
   };
 
-  const getEtatColor = (etat: string) => {
+  const getEtatColor = (etat: string | null) => {
     switch (etat) {
-      case "Planifiée":
+      case "EC":
         return "bg-blue-500";
-      case "En cours":
-        return "bg-yellow-500";
-      case "Livrée":
+      case "LI":
         return "bg-green-500";
+      case "AL":
+        return "bg-red-500";
       default:
         return "bg-gray-500";
     }
   };
 
+  const getEtatLabel = (etat: string | null) => {
+    switch (etat) {
+      case "EC":
+        return "En cours";
+      case "LI":
+        return "Livrée";
+      case "AL":
+        return "Annulée Livrée";
+      default:
+        return etat || "N/A";
+    }
+  };
+
   const filteredLivraisons = livraisons.filter(
     (liv) =>
-      liv.nocde.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      liv.client.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      liv.livreur.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      liv.ville.includes(searchTerm)
+      liv.nocde?.toString().includes(searchTerm) ||
+      (liv.commandes?.clients?.nomclt || "").toLowerCase().includes(searchTerm.toLowerCase()) ||
+      (liv.personnel?.nompers || "").toLowerCase().includes(searchTerm.toLowerCase())
   );
+
+  if (isLoading || commandesLoading || personnelLoading) {
+    return (
+      <div className="min-h-screen bg-background flex items-center justify-center">
+        <p>Chargement...</p>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen bg-background">
@@ -258,18 +216,24 @@ const Livraisons = () => {
               </TableHeader>
               <TableBody>
                 {filteredLivraisons.map((livraison) => (
-                  <TableRow key={livraison.nocde}>
+                  <TableRow key={livraison.id}>
                     <TableCell className="font-medium">{livraison.nocde}</TableCell>
-                    <TableCell>{livraison.client}</TableCell>
                     <TableCell>
-                      {new Date(livraison.dateliv).toLocaleDateString("fr-FR")}
+                      {livraison.commandes?.clients 
+                        ? `${livraison.commandes.clients.nomclt} ${livraison.commandes.clients.prenomclt || ""}` 
+                        : "N/A"}
                     </TableCell>
-                    <TableCell>{livraison.livreur}</TableCell>
-                    <TableCell>{livraison.ville}</TableCell>
-                    <TableCell>{livraison.modepay}</TableCell>
                     <TableCell>
-                      <Badge className={`${getEtatColor(livraison.etaliv)} text-white`}>
-                        {livraison.etaliv}
+                      {livraison.dateliv ? new Date(livraison.dateliv).toLocaleDateString("fr-FR") : "N/A"}
+                    </TableCell>
+                    <TableCell>
+                      {livraison.personnel ? `${livraison.personnel.nompers} ${livraison.personnel.prenompers}` : "N/A"}
+                    </TableCell>
+                    <TableCell>{livraison.commandes?.clients?.adrclt || "N/A"}</TableCell>
+                    <TableCell>{livraison.modepay || "N/A"}</TableCell>
+                    <TableCell>
+                      <Badge className={`${getEtatColor(livraison.etatliv)} text-white`}>
+                        {getEtatLabel(livraison.etatliv)}
                       </Badge>
                     </TableCell>
                     <TableCell className="text-right">
@@ -280,7 +244,7 @@ const Livraisons = () => {
                         <Button 
                           variant="ghost" 
                           size="sm"
-                          onClick={() => handleDelete(livraison.nocde)}
+                          onClick={() => handleDelete(livraison.id)}
                         >
                           <Trash2 className="h-4 w-4 text-destructive" />
                         </Button>
@@ -318,8 +282,8 @@ const Livraisons = () => {
                         </FormControl>
                         <SelectContent>
                           {commandesPretes.map((cmd) => (
-                            <SelectItem key={cmd.nocde} value={cmd.nocde}>
-                              {cmd.nocde} - {cmd.client} ({cmd.ville})
+                            <SelectItem key={cmd.nocde} value={String(cmd.nocde)}>
+                              {cmd.nocde} - {cmd.clients ? `${cmd.clients.nomclt} ${cmd.clients.prenomclt || ""}` : "N/A"}
                             </SelectItem>
                           ))}
                         </SelectContent>
@@ -355,8 +319,8 @@ const Livraisons = () => {
                         </FormControl>
                         <SelectContent>
                           {livreurs.map((liv) => (
-                            <SelectItem key={liv.id} value={liv.id}>
-                              {liv.nom}
+                            <SelectItem key={liv.idpers} value={String(liv.idpers)}>
+                              {liv.nompers} {liv.prenompers}
                             </SelectItem>
                           ))}
                         </SelectContent>

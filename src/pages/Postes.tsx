@@ -3,6 +3,7 @@ import { useNavigate } from "react-router-dom";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import * as z from "zod";
+import { usePostes } from "@/hooks/usePostes";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -36,8 +37,8 @@ import { useToast } from "@/hooks/use-toast";
 const posteSchema = z.object({
   codeposte: z.string().min(1, "Code obligatoire"),
   libelle: z.string().min(3, "Libellé minimum 3 caractères"),
-  indice: z.coerce.number().min(100, "Indice minimum 100").max(1000, "Indice maximum 1000"),
-  description: z.string().min(5, "Description minimum 5 caractères"),
+  indice: z.coerce.number().min(1, "Indice minimum 1").max(100, "Indice maximum 100"),
+  description: z.string().optional(),
 });
 
 const Postes = () => {
@@ -46,47 +47,17 @@ const Postes = () => {
   const [searchTerm, setSearchTerm] = useState("");
   const [isDialogOpen, setIsDialogOpen] = useState(false);
 
+  const { postes, isLoading, addPoste, deletePoste } = usePostes();
+
   const form = useForm<z.infer<typeof posteSchema>>({
     resolver: zodResolver(posteSchema),
     defaultValues: {
       codeposte: "",
       libelle: "",
-      indice: 250,
+      indice: 5,
       description: "",
     },
   });
-
-  // Données simulées
-  const [postes, setPostes] = useState([
-    {
-      codeposte: "P001",
-      libelle: "Administrateur",
-      indice: 500,
-      description: "Gestion complète du système",
-      nbEmployes: 3,
-    },
-    {
-      codeposte: "P002",
-      libelle: "Magasinier",
-      indice: 300,
-      description: "Gestion du stock et des articles",
-      nbEmployes: 8,
-    },
-    {
-      codeposte: "P003",
-      libelle: "Livreur",
-      indice: 250,
-      description: "Livraison des commandes clients",
-      nbEmployes: 18,
-    },
-    {
-      codeposte: "P004",
-      libelle: "Chef Livreur",
-      indice: 350,
-      description: "Coordination des livraisons",
-      nbEmployes: 5,
-    },
-  ]);
 
   const filteredPostes = postes.filter(
     (poste) =>
@@ -95,46 +66,33 @@ const Postes = () => {
   );
 
   const getIndiceBadge = (indice: number) => {
-    if (indice >= 400) return <Badge className="bg-destructive text-destructive-foreground">Élevé</Badge>;
-    if (indice >= 300) return <Badge className="bg-warning text-warning-foreground">Moyen</Badge>;
+    if (indice >= 7) return <Badge className="bg-destructive text-destructive-foreground">Élevé</Badge>;
+    if (indice >= 5) return <Badge className="bg-warning text-warning-foreground">Moyen</Badge>;
     return <Badge className="bg-info text-info-foreground">Base</Badge>;
   };
 
   const onSubmit = (data: z.infer<typeof posteSchema>) => {
-    if (postes.some(p => p.codeposte === data.codeposte)) {
-      toast({
-        title: "Erreur",
-        description: "Ce code poste existe déjà",
-        variant: "destructive",
-      });
-      return;
-    }
-
-    setPostes([...postes, { ...data, nbEmployes: 0 } as any]);
-    toast({
-      title: "Poste ajouté",
-      description: `${data.libelle} a été ajouté`,
+    addPoste({
+      codeposte: data.codeposte,
+      libelle: data.libelle,
+      indice: data.indice,
+      description: data.description,
     });
     setIsDialogOpen(false);
     form.reset();
   };
 
   const handleDelete = (codeposte: string) => {
-    const poste = postes.find(p => p.codeposte === codeposte);
-    if (poste && poste.nbEmployes > 0) {
-      toast({
-        title: "Suppression impossible",
-        description: "Ce poste a des employés associés",
-        variant: "destructive",
-      });
-      return;
-    }
-    setPostes(postes.filter(p => p.codeposte !== codeposte));
-    toast({
-      title: "Poste supprimé",
-      description: "Le poste a été supprimé",
-    });
+    deletePoste(codeposte);
   };
+
+  if (isLoading) {
+    return (
+      <div className="min-h-screen bg-background flex items-center justify-center">
+        <p>Chargement...</p>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen bg-background">
@@ -218,11 +176,11 @@ const Postes = () => {
                   <TableRow key={poste.codeposte}>
                     <TableCell className="font-medium">{poste.codeposte}</TableCell>
                     <TableCell className="font-semibold">{poste.libelle}</TableCell>
-                    <TableCell className="text-muted-foreground">{poste.description}</TableCell>
+                    <TableCell className="text-muted-foreground">{poste.description || "N/A"}</TableCell>
                     <TableCell className="font-mono">{poste.indice}</TableCell>
                     <TableCell>{getIndiceBadge(poste.indice)}</TableCell>
                     <TableCell>
-                      <Badge variant="outline">{poste.nbEmployes} employés</Badge>
+                      <Badge variant="outline">0 employés</Badge>
                     </TableCell>
                     <TableCell className="text-right">
                       <div className="flex justify-end gap-2">
@@ -231,8 +189,7 @@ const Postes = () => {
                         </Button>
                         <Button 
                           variant="ghost" 
-                          size="sm" 
-                          disabled={poste.nbEmployes > 0}
+                          size="sm"
                           onClick={() => handleDelete(poste.codeposte)}
                         >
                           <Trash2 className="h-4 w-4 text-destructive" />
@@ -260,11 +217,11 @@ const Postes = () => {
                     <div className="w-32 h-2 bg-secondary rounded-full overflow-hidden">
                       <div
                         className="h-full bg-primary"
-                        style={{ width: `${(poste.nbEmployes / 34) * 100}%` }}
+                        style={{ width: "0%" }}
                       />
                     </div>
                     <span className="text-sm text-muted-foreground w-12 text-right">
-                      {poste.nbEmployes}
+                      0
                     </span>
                   </div>
                 </div>

@@ -3,6 +3,8 @@ import { useNavigate } from "react-router-dom";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import * as z from "zod";
+import { usePersonnel } from "@/hooks/usePersonnel";
+import { usePostes } from "@/hooks/usePostes";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -41,14 +43,14 @@ import { ArrowLeft, Plus, Search, Edit, Trash2, UserCog, Shield } from "lucide-r
 import { useToast } from "@/hooks/use-toast";
 
 const personnelSchema = z.object({
-  idpers: z.string().min(1, "ID obligatoire"),
   nompers: z.string().min(2, "Nom minimum 2 caractères"),
-  prenonpers: z.string().min(2, "Prénom minimum 2 caractères"),
+  prenompers: z.string().min(2, "Prénom minimum 2 caractères"),
   adrpers: z.string().min(5, "Adresse minimum 5 caractères"),
   villepers: z.string().min(2, "Ville obligatoire"),
-  telpers: z.string().regex(/^0[1-9]\d{8}$/, "Format: 0123456789"),
+  telpers: z.coerce.number().min(10000000, "Téléphone invalide"),
   d_embauche: z.string().min(1, "Date obligatoire"),
-  Login: z.string().min(3, "Login minimum 3 caractères"),
+  login: z.string().min(3, "Login minimum 3 caractères"),
+  motp: z.string().min(8, "Mot de passe minimum 8 caractères"),
   codeposte: z.string().min(1, "Poste obligatoire"),
 });
 
@@ -58,91 +60,36 @@ const Personnel = () => {
   const [searchTerm, setSearchTerm] = useState("");
   const [isDialogOpen, setIsDialogOpen] = useState(false);
 
-  const postes = [
-    { code: "P001", libelle: "Administrateur" },
-    { code: "P002", libelle: "Magasinier" },
-    { code: "P003", libelle: "Livreur" },
-    { code: "P004", libelle: "Chef Livreur" },
-  ];
+  const { personnel, isLoading, addPersonnel, deletePersonnel } = usePersonnel();
+  const { postes, isLoading: postesLoading } = usePostes();
 
   const form = useForm<z.infer<typeof personnelSchema>>({
     resolver: zodResolver(personnelSchema),
     defaultValues: {
-      idpers: "",
       nompers: "",
-      prenonpers: "",
+      prenompers: "",
       adrpers: "",
       villepers: "",
-      telpers: "",
+      telpers: 0,
       d_embauche: new Date().toISOString().split('T')[0],
-      Login: "",
+      login: "",
+      motp: "",
       codeposte: "",
     },
   });
 
-  // Données simulées
-  const [personnel, setPersonnel] = useState([
-    {
-      idpers: "PER001",
-      nompers: "Administrateur",
-      prenonpers: "Admin",
-      adrpers: "Siège Social",
-      villepers: "Paris",
-      telpers: "0123456789",
-      d_embauche: "2020-01-15",
-      Login: "admin",
-      codeposte: "P001",
-      libellePoste: "Administrateur",
-    },
-    {
-      idpers: "PER002",
-      nompers: "Martin",
-      prenonpers: "Pierre",
-      adrpers: "12 Rue du Stock",
-      villepers: "Paris",
-      telpers: "0145678901",
-      d_embauche: "2021-03-20",
-      Login: "pmartin",
-      codeposte: "P002",
-      libellePoste: "Magasinier",
-    },
-    {
-      idpers: "PER003",
-      nompers: "Dubois",
-      prenonpers: "Jean",
-      adrpers: "8 Avenue des Livraisons",
-      villepers: "Paris",
-      telpers: "0156789012",
-      d_embauche: "2021-06-10",
-      Login: "jdubois",
-      codeposte: "P003",
-      libellePoste: "Livreur",
-    },
-    {
-      idpers: "PER004",
-      nompers: "Petit",
-      prenonpers: "Marie",
-      adrpers: "25 Boulevard des Livraisons",
-      villepers: "Paris",
-      telpers: "0167890123",
-      d_embauche: "2022-02-15",
-      Login: "mpetit",
-      codeposte: "P004",
-      libellePoste: "Chef Livreur",
-    },
-  ]);
-
   const filteredPersonnel = personnel.filter(
     (pers) =>
-      pers.idpers.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      pers.idpers.toString().includes(searchTerm) ||
       pers.nompers.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      pers.prenonpers.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      pers.Login.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      pers.libellePoste.toLowerCase().includes(searchTerm.toLowerCase())
+      pers.prenompers.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      (pers.login || "").toLowerCase().includes(searchTerm.toLowerCase()) ||
+      (pers.postes?.libelle || "").toLowerCase().includes(searchTerm.toLowerCase())
   );
 
-  const getRoleBadge = (poste: string) => {
-    switch (poste) {
+  const getRoleBadge = (libelle: string | undefined) => {
+    if (!libelle) return <Badge variant="outline">N/A</Badge>;
+    switch (libelle) {
       case "Administrateur":
         return <Badge className="bg-destructive text-destructive-foreground">Admin</Badge>;
       case "Chef Livreur":
@@ -152,37 +99,37 @@ const Personnel = () => {
       case "Livreur":
         return <Badge className="bg-success text-success-foreground">Livreur</Badge>;
       default:
-        return <Badge variant="outline">{poste}</Badge>;
+        return <Badge variant="outline">{libelle}</Badge>;
     }
   };
 
   const onSubmit = (data: z.infer<typeof personnelSchema>) => {
-    if (personnel.some(p => p.idpers === data.idpers)) {
-      toast({
-        title: "Erreur",
-        description: "Cet ID existe déjà",
-        variant: "destructive",
-      });
-      return;
-    }
-
-    const posteInfo = postes.find(p => p.code === data.codeposte);
-    setPersonnel([...personnel, { ...data, libellePoste: posteInfo?.libelle || "" } as any]);
-    toast({
-      title: "Employé ajouté",
-      description: `${data.prenonpers} ${data.nompers} a été ajouté`,
+    addPersonnel({
+      nompers: data.nompers,
+      prenompers: data.prenompers,
+      adrpers: data.adrpers,
+      villepers: data.villepers,
+      telpers: data.telpers,
+      d_embauche: data.d_embauche,
+      login: data.login,
+      motp: data.motp,
+      codeposte: data.codeposte,
     });
     setIsDialogOpen(false);
     form.reset();
   };
 
-  const handleDelete = (idpers: string) => {
-    setPersonnel(personnel.filter(p => p.idpers !== idpers));
-    toast({
-      title: "Employé supprimé",
-      description: "L'employé a été supprimé",
-    });
+  const handleDelete = (idpers: number) => {
+    deletePersonnel(idpers);
   };
+
+  if (isLoading || postesLoading) {
+    return (
+      <div className="min-h-screen bg-background flex items-center justify-center">
+        <p>Chargement...</p>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen bg-background">
@@ -277,19 +224,19 @@ const Personnel = () => {
                   <TableRow key={pers.idpers}>
                     <TableCell className="font-medium">{pers.idpers}</TableCell>
                     <TableCell>{pers.nompers}</TableCell>
-                    <TableCell>{pers.prenonpers}</TableCell>
+                    <TableCell>{pers.prenompers}</TableCell>
                     <TableCell>
                       <div className="flex items-center gap-1">
                         <Shield className="h-3 w-3 text-muted-foreground" />
-                        <span className="font-mono text-sm">{pers.Login}</span>
+                        <span className="font-mono text-sm">{pers.login}</span>
                       </div>
                     </TableCell>
                     <TableCell>{pers.villepers}</TableCell>
                     <TableCell>{pers.telpers}</TableCell>
                     <TableCell>
-                      {new Date(pers.d_embauche).toLocaleDateString("fr-FR")}
+                      {pers.d_embauche ? new Date(pers.d_embauche).toLocaleDateString("fr-FR") : "N/A"}
                     </TableCell>
-                    <TableCell>{getRoleBadge(pers.libellePoste)}</TableCell>
+                    <TableCell>{getRoleBadge(pers.postes?.libelle)}</TableCell>
                     <TableCell className="text-right">
                       <div className="flex justify-end gap-2">
                         <Button variant="ghost" size="sm">
@@ -333,12 +280,12 @@ const Personnel = () => {
               <div className="grid grid-cols-2 gap-4">
                 <FormField
                   control={form.control}
-                  name="idpers"
+                  name="login"
                   render={({ field }) => (
                     <FormItem>
-                      <FormLabel>ID Personnel</FormLabel>
+                      <FormLabel>Login</FormLabel>
                       <FormControl>
-                        <Input placeholder="PER001" {...field} />
+                        <Input placeholder="jdupont" {...field} />
                       </FormControl>
                       <FormMessage />
                     </FormItem>
@@ -346,12 +293,12 @@ const Personnel = () => {
                 />
                 <FormField
                   control={form.control}
-                  name="Login"
+                  name="motp"
                   render={({ field }) => (
                     <FormItem>
-                      <FormLabel>Login</FormLabel>
+                      <FormLabel>Mot de passe</FormLabel>
                       <FormControl>
-                        <Input placeholder="jdupont" {...field} />
+                        <Input type="password" placeholder="pass1234" {...field} />
                       </FormControl>
                       <FormMessage />
                     </FormItem>
@@ -374,7 +321,7 @@ const Personnel = () => {
                 />
                 <FormField
                   control={form.control}
-                  name="prenonpers"
+                  name="prenompers"
                   render={({ field }) => (
                     <FormItem>
                       <FormLabel>Prénom</FormLabel>
@@ -420,7 +367,7 @@ const Personnel = () => {
                     <FormItem>
                       <FormLabel>Téléphone</FormLabel>
                       <FormControl>
-                        <Input placeholder="0123456789" {...field} />
+                        <Input type="number" placeholder="20373057" {...field} />
                       </FormControl>
                       <FormMessage />
                     </FormItem>
@@ -455,7 +402,7 @@ const Personnel = () => {
                         </FormControl>
                         <SelectContent>
                           {postes.map((poste) => (
-                            <SelectItem key={poste.code} value={poste.code}>
+                            <SelectItem key={poste.codeposte} value={poste.codeposte}>
                               {poste.libelle}
                             </SelectItem>
                           ))}
