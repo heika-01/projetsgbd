@@ -9,8 +9,8 @@ import {
   UserCog,
   Briefcase,
   LogOut,
-  BarChart3,
 } from "lucide-react";
+import { ThemeToggle } from "@/components/ThemeToggle";
 
 const Dashboard = () => {
   const navigate = useNavigate();
@@ -93,6 +93,7 @@ const Dashboard = () => {
               <p className="text-sm font-medium text-foreground">{userLogin}</p>
               <p className="text-xs text-muted-foreground">{userRole}</p>
             </div>
+            <ThemeToggle />
             <Button variant="outline" size="sm" onClick={handleLogout}>
               <LogOut className="h-4 w-4 mr-2" />
               Déconnexion
