@@ -7,23 +7,12 @@ import { useCommandes } from "@/hooks/useCommandes";
 import { useClients } from "@/hooks/useClients";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
 import {
   Dialog,
   DialogContent,
-  DialogDescription,
   DialogHeader,
   DialogTitle,
-  DialogTrigger,
 } from "@/components/ui/dialog";
 import { Label } from "@/components/ui/label";
 import {
@@ -33,8 +22,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { ArrowLeft, Plus, Search, Edit, Trash2 } from "lucide-react";
-import { useToast } from "@/hooks/use-toast";
+import { ArrowLeft, Plus, Search, Edit, Trash2, ShoppingCart } from "lucide-react";
 import {
   Form,
   FormControl,
@@ -43,25 +31,24 @@ import {
   FormLabel,
   FormMessage,
 } from "@/components/ui/form";
+import { ThemeToggle } from "@/components/ThemeToggle";
 
 const commandeSchema = z.object({
   noclt: z.string().min(1, "Sélectionnez un client"),
   datecde: z.string().min(1, "Date requise"),
 });
 
-// États possibles: EC (En Cours), Pr (Prête), lI (Livrée), SO (Sortie), AN (Annulée), AL (Annulée Livrée)
 const etats = [
-  { value: "EC", label: "En Cours", color: "bg-blue-500" },
-  { value: "Pr", label: "Prête", color: "bg-yellow-500" },
-  { value: "lI", label: "Livrée", color: "bg-green-500" },
-  { value: "SO", label: "Sortie", color: "bg-purple-500" },
-  { value: "AN", label: "Annulée", color: "bg-red-500" },
-  { value: "AL", label: "Annulée Livrée", color: "bg-orange-500" },
+  { value: "EC", label: "En Cours", color: "bg-info/20 text-info border-info/40" },
+  { value: "Pr", label: "Prête", color: "bg-warning/20 text-warning border-warning/40" },
+  { value: "lI", label: "Livrée", color: "bg-success/20 text-success border-success/40" },
+  { value: "SO", label: "Sortie", color: "bg-primary/20 text-primary border-primary/40" },
+  { value: "AN", label: "Annulée", color: "bg-destructive/20 text-destructive border-destructive/40" },
+  { value: "AL", label: "Annulée Livrée", color: "bg-muted text-muted-foreground border-border" },
 ];
 
 const Commandes = () => {
   const navigate = useNavigate();
-  const { toast } = useToast();
   const [searchTerm, setSearchTerm] = useState("");
   const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
   const [isAddDialogOpen, setIsAddDialogOpen] = useState(false);
@@ -72,19 +59,10 @@ const Commandes = () => {
 
   const form = useForm<z.infer<typeof commandeSchema>>({
     resolver: zodResolver(commandeSchema),
-    defaultValues: {
-      noclt: "",
-      datecde: new Date().toISOString().split('T')[0],
-    },
+    defaultValues: { noclt: "", datecde: new Date().toISOString().split('T')[0] },
   });
 
-  const getEtatColor = (etat: string) => {
-    return etats.find(e => e.value === etat)?.color || "bg-gray-500";
-  };
-
-  const getEtatLabel = (etat: string) => {
-    return etats.find(e => e.value === etat)?.label || etat;
-  };
+  const getEtat = (etat: string) => etats.find(e => e.value === etat) || etats[0];
 
   const onSubmit = (data: z.infer<typeof commandeSchema>) => {
     addCommande({ noclt: Number(data.noclt), datecde: data.datecde, etatcde: "EC" });
@@ -105,9 +83,7 @@ const Commandes = () => {
     }
   };
 
-  const handleDelete = (nocde: string) => {
-    deleteCommande(Number(nocde));
-  };
+  const handleDelete = (nocde: string) => deleteCommande(Number(nocde));
 
   const filteredCommandes = commandes.filter(cmd =>
     cmd.nocde.toString().includes(searchTerm) ||
@@ -118,111 +94,105 @@ const Commandes = () => {
   if (isLoading || clientsLoading) {
     return (
       <div className="min-h-screen bg-background flex items-center justify-center">
-        <p>Chargement...</p>
+        <div className="w-8 h-8 border-4 border-primary border-t-transparent rounded-full animate-spin" />
       </div>
     );
   }
 
   return (
-    <div className="min-h-screen bg-background">
-      <header className="bg-card border-b border-border sticky top-0 z-50 shadow-sm">
-        <div className="container mx-auto px-6 py-4 flex items-center justify-between">
-          <div className="flex items-center gap-3">
-            <Button variant="ghost" size="sm" onClick={() => navigate("/dashboard")}>
-              <ArrowLeft className="h-4 w-4" />
+    <div className="min-h-screen bg-background relative overflow-hidden">
+      <div className="fixed top-0 right-0 w-[500px] h-[500px] bg-primary/10 rounded-full blur-[150px] -translate-y-1/2 translate-x-1/3 pointer-events-none" />
+
+      <header className="sticky top-0 z-50 glass border-b border-border/30">
+        <div className="max-w-7xl mx-auto px-6 py-4 flex items-center justify-between">
+          <div className="flex items-center gap-4">
+            <Button variant="ghost" size="icon" onClick={() => navigate("/dashboard")} className="rounded-xl">
+              <ArrowLeft className="h-5 w-5" />
             </Button>
-            <h1 className="text-2xl font-bold text-foreground">Gestion des Commandes</h1>
+            <div>
+              <h1 className="text-lg font-bold text-foreground">Commandes</h1>
+              <p className="text-xs text-muted-foreground">{commandes.length} commandes</p>
+            </div>
           </div>
-          <Button onClick={() => setIsAddDialogOpen(true)}>
-            <Plus className="h-4 w-4 mr-2" />
-            Nouvelle Commande
-          </Button>
+          <div className="flex items-center gap-3">
+            <ThemeToggle />
+            <Button onClick={() => setIsAddDialogOpen(true)} className="rounded-xl bg-gradient-to-r from-primary to-accent glow-primary">
+              <Plus className="h-4 w-4 mr-2" />
+              Nouvelle
+            </Button>
+          </div>
         </div>
       </header>
 
-      <main className="container mx-auto px-6 py-8">
-        <Card>
-          <CardHeader>
-            <div className="flex items-center justify-between">
-              <CardTitle>Liste des Commandes</CardTitle>
-              <div className="flex items-center gap-2 w-80">
-                <Search className="h-4 w-4 text-muted-foreground" />
-                <Input
-                  placeholder="Rechercher par numéro, client ou date..."
-                  value={searchTerm}
-                  onChange={(e) => setSearchTerm(e.target.value)}
-                />
-              </div>
+      <main className="max-w-7xl mx-auto px-6 py-8 relative">
+        <div className="relative mb-6">
+          <Search className="absolute left-4 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+          <Input
+            placeholder="Rechercher par numéro, client ou date..."
+            value={searchTerm}
+            onChange={(e) => setSearchTerm(e.target.value)}
+            className="pl-11 h-12 rounded-2xl glass border-border/50 focus:border-primary"
+          />
+        </div>
+
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+          {filteredCommandes.length === 0 ? (
+            <div className="col-span-full glass rounded-2xl p-12 text-center">
+              <ShoppingCart className="h-16 w-16 mx-auto mb-4 text-muted-foreground/30" />
+              <p className="text-muted-foreground">Aucune commande trouvée</p>
             </div>
-          </CardHeader>
-          <CardContent>
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>N° Commande</TableHead>
-                  <TableHead>Client</TableHead>
-                  <TableHead>Date</TableHead>
-                  <TableHead>État</TableHead>
-                  <TableHead className="text-right">Actions</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {filteredCommandes.map((commande) => (
-                  <TableRow key={commande.nocde}>
-                    <TableCell className="font-medium">{commande.nocde}</TableCell>
-                    <TableCell>{commande.clients ? `${commande.clients.nomclt} ${commande.clients.prenomclt || ""}` : "N/A"}</TableCell>
-                    <TableCell>{commande.datecde ? new Date(commande.datecde).toLocaleDateString('fr-FR') : "N/A"}</TableCell>
-                    <TableCell>
-                      <Badge className={`${getEtatColor(commande.etatcde || "")} text-white`}>
-                        {getEtatLabel(commande.etatcde || "")}
-                      </Badge>
-                    </TableCell>
-                    <TableCell className="text-right">
-                      <div className="flex justify-end gap-2">
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          onClick={() => handleEdit(commande)}
-                        >
-                          <Edit className="h-4 w-4" />
-                        </Button>
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          onClick={() => handleDelete(commande.nocde.toString())}
-                        >
-                          <Trash2 className="h-4 w-4 text-destructive" />
-                        </Button>
-                      </div>
-                    </TableCell>
-                  </TableRow>
-                ))}
-              </TableBody>
-            </Table>
-          </CardContent>
-        </Card>
+          ) : (
+            filteredCommandes.map((commande) => {
+              const etat = getEtat(commande.etatcde || "");
+              return (
+                <div key={commande.nocde} className="glass rounded-2xl p-5 hover:shadow-lg transition-all group">
+                  <div className="flex items-start justify-between mb-4">
+                    <Badge variant="outline" className={`${etat.color} border rounded-full px-3 text-xs`}>
+                      {etat.label}
+                    </Badge>
+                    <div className="flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                      <Button variant="ghost" size="icon" className="h-8 w-8 rounded-xl" onClick={() => handleEdit(commande)}>
+                        <Edit className="h-4 w-4" />
+                      </Button>
+                      <Button variant="ghost" size="icon" className="h-8 w-8 rounded-xl hover:bg-destructive/10" onClick={() => handleDelete(commande.nocde.toString())}>
+                        <Trash2 className="h-4 w-4 text-destructive" />
+                      </Button>
+                    </div>
+                  </div>
+                  
+                  <p className="font-mono text-lg font-bold text-primary mb-2">#{commande.nocde}</p>
+                  
+                  <div className="space-y-1 text-sm">
+                    <p className="text-foreground font-medium">
+                      {commande.clients ? `${commande.clients.nomclt} ${commande.clients.prenomclt || ""}` : "N/A"}
+                    </p>
+                    <p className="text-muted-foreground">
+                      {commande.datecde ? new Date(commande.datecde).toLocaleDateString('fr-FR') : "N/A"}
+                    </p>
+                  </div>
+                </div>
+              );
+            })
+          )}
+        </div>
       </main>
 
-      {/* Dialog d'ajout */}
       <Dialog open={isAddDialogOpen} onOpenChange={setIsAddDialogOpen}>
-        <DialogContent>
+        <DialogContent className="glass-strong rounded-3xl border-border/50">
           <DialogHeader>
-            <DialogTitle>Nouvelle Commande</DialogTitle>
-            <DialogDescription>
-              Créer une nouvelle commande client
-            </DialogDescription>
+            <DialogTitle className="text-xl font-bold">Nouvelle Commande</DialogTitle>
           </DialogHeader>
           <Form {...form}>
-            <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
+            <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-5">
               <FormField
                 control={form.control}
                 name="noclt"
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel>Client *</FormLabel>
+                    <FormLabel className="text-muted-foreground">Client</FormLabel>
                     <Select onValueChange={field.onChange} value={field.value}>
                       <FormControl>
-                        <SelectTrigger>
+                        <SelectTrigger className="h-12 rounded-xl bg-secondary/50 border-border/50">
                           <SelectValue placeholder="Sélectionner un client" />
                         </SelectTrigger>
                       </FormControl>
@@ -243,63 +213,52 @@ const Commandes = () => {
                 name="datecde"
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel>Date de Commande *</FormLabel>
+                    <FormLabel className="text-muted-foreground">Date</FormLabel>
                     <FormControl>
-                      <Input type="date" {...field} />
+                      <Input type="date" {...field} className="h-12 rounded-xl bg-secondary/50 border-border/50" />
                     </FormControl>
                     <FormMessage />
                   </FormItem>
                 )}
               />
-              <div className="flex justify-end gap-2 pt-4">
-                <Button
-                  type="button"
-                  variant="outline"
-                  onClick={() => setIsAddDialogOpen(false)}
-                >
+              <div className="flex gap-3 pt-4">
+                <Button type="button" variant="ghost" onClick={() => setIsAddDialogOpen(false)} className="flex-1 h-12 rounded-xl">
                   Annuler
                 </Button>
-                <Button type="submit">Créer la Commande</Button>
+                <Button type="submit" className="flex-1 h-12 rounded-xl bg-gradient-to-r from-primary to-accent glow-primary">
+                  Créer
+                </Button>
               </div>
             </form>
           </Form>
         </DialogContent>
       </Dialog>
 
-      {/* Dialog de modification */}
       <Dialog open={isEditDialogOpen} onOpenChange={setIsEditDialogOpen}>
-        <DialogContent>
+        <DialogContent className="glass-strong rounded-3xl border-border/50">
           <DialogHeader>
-            <DialogTitle>Modifier l'état de la commande</DialogTitle>
-            <DialogDescription>
-              Commande: {editingCommande?.nocde} - {editingCommande?.nomClient}
-            </DialogDescription>
+            <DialogTitle className="text-xl font-bold">Modifier l'état</DialogTitle>
           </DialogHeader>
-          <div className="space-y-4 py-4">
-            <div className="space-y-2">
-              <Label>État actuel</Label>
-              <Badge className={`${getEtatColor(editingCommande?.etatcde)} text-white`}>
-                {getEtatLabel(editingCommande?.etatcde)}
+          <div className="space-y-5">
+            <div>
+              <Label className="text-muted-foreground text-sm">État actuel</Label>
+              <Badge className={`${getEtat(editingCommande?.etatcde).color} border rounded-full px-3 mt-2`}>
+                {getEtat(editingCommande?.etatcde).label}
               </Badge>
             </div>
-            <div className="space-y-2">
-              <Label>Nouvel état</Label>
+            <div>
+              <Label className="text-muted-foreground text-sm">Nouvel état</Label>
               <Select onValueChange={handleSaveEdit}>
-                <SelectTrigger>
+                <SelectTrigger className="h-12 rounded-xl bg-secondary/50 border-border/50 mt-2">
                   <SelectValue placeholder="Sélectionner un état" />
                 </SelectTrigger>
                 <SelectContent>
                   {etats.map((etat) => (
-                    <SelectItem key={etat.value} value={etat.value}>
-                      {etat.label}
-                    </SelectItem>
+                    <SelectItem key={etat.value} value={etat.value}>{etat.label}</SelectItem>
                   ))}
                 </SelectContent>
               </Select>
             </div>
-            <p className="text-sm text-muted-foreground">
-              Transitions valides: EC→Pr→lI→SO ou EC→AN ou Pr→AN ou Pr→AL
-            </p>
           </div>
         </DialogContent>
       </Dialog>
