@@ -8,7 +8,6 @@ import { useCommandes } from "@/hooks/useCommandes";
 import { usePersonnel } from "@/hooks/usePersonnel";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import {
   Table,
   TableBody,
@@ -25,7 +24,6 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
-import { Label } from "@/components/ui/label";
 import {
   Select,
   SelectContent,
@@ -41,8 +39,8 @@ import {
   FormLabel,
   FormMessage,
 } from "@/components/ui/form";
-import { ArrowLeft, Plus, Search, Edit, Trash2, Truck } from "lucide-react";
-import { useToast } from "@/hooks/use-toast";
+import { ArrowLeft, Plus, Search, Edit, Trash2, Truck, Package, Clock, CheckCircle } from "lucide-react";
+import { ThemeToggle } from "@/components/ThemeToggle";
 
 const livraisonSchema = z.object({
   nocde: z.string().min(1, "Sélectionnez une commande"),
@@ -53,7 +51,6 @@ const livraisonSchema = z.object({
 
 const Livraisons = () => {
   const navigate = useNavigate();
-  const { toast } = useToast();
   const [searchTerm, setSearchTerm] = useState("");
   const [isDialogOpen, setIsDialogOpen] = useState(false);
 
@@ -71,12 +68,8 @@ const Livraisons = () => {
     },
   });
 
-  // Commandes "Prêtes" (état PR)
   const commandesPretes = commandes.filter(c => c.etatcde === "PR");
-
-  // Livreurs (personnel avec codeposte LIV)
   const livreurs = personnel.filter(p => p.codeposte === "LIV");
-
   const modesPaiement = ["avant_livraison", "apres_livraison"];
 
   const onSubmit = (data: z.infer<typeof livraisonSchema>) => {
@@ -95,29 +88,25 @@ const Livraisons = () => {
     deleteLivraison(id);
   };
 
-  const getEtatColor = (etat: string | null) => {
+  const getEtatStyle = (etat: string | null) => {
     switch (etat) {
       case "EC":
-        return "bg-blue-500";
+        return "bg-info/20 text-info border-info/30";
       case "LI":
-        return "bg-green-500";
+        return "bg-success/20 text-success border-success/30";
       case "AL":
-        return "bg-red-500";
+        return "bg-destructive/20 text-destructive border-destructive/30";
       default:
-        return "bg-gray-500";
+        return "bg-muted text-muted-foreground";
     }
   };
 
   const getEtatLabel = (etat: string | null) => {
     switch (etat) {
-      case "EC":
-        return "En cours";
-      case "LI":
-        return "Livrée";
-      case "AL":
-        return "Annulée Livrée";
-      default:
-        return etat || "N/A";
+      case "EC": return "En cours";
+      case "LI": return "Livrée";
+      case "AL": return "Annulée";
+      default: return etat || "N/A";
     }
   };
 
@@ -128,122 +117,142 @@ const Livraisons = () => {
       (liv.personnel?.nompers || "").toLowerCase().includes(searchTerm.toLowerCase())
   );
 
+  const enCoursCount = livraisons.filter(l => l.etatliv === "EC").length;
+  const livreesCount = livraisons.filter(l => l.etatliv === "LI").length;
+
   if (isLoading || commandesLoading || personnelLoading) {
     return (
       <div className="min-h-screen bg-background flex items-center justify-center">
-        <p>Chargement...</p>
+        <div className="animate-pulse text-muted-foreground">Chargement...</div>
       </div>
     );
   }
 
   return (
     <div className="min-h-screen bg-background">
-      <header className="bg-card border-b border-border sticky top-0 z-50 shadow-sm">
-        <div className="container mx-auto px-6 py-4 flex items-center justify-between">
-          <div className="flex items-center gap-3">
-            <Button variant="ghost" size="sm" onClick={() => navigate("/dashboard")}>
-              <ArrowLeft className="h-4 w-4" />
+      {/* Header minimaliste */}
+      <header className="border-b border-border/50 bg-card/50 backdrop-blur-sm sticky top-0 z-50">
+        <div className="max-w-7xl mx-auto px-8 py-5 flex items-center justify-between">
+          <div className="flex items-center gap-4">
+            <Button 
+              variant="ghost" 
+              size="icon"
+              onClick={() => navigate("/dashboard")}
+              className="rounded-full hover:bg-secondary"
+            >
+              <ArrowLeft className="h-5 w-5" />
             </Button>
-            <Truck className="h-6 w-6 text-primary" />
-            <h1 className="text-2xl font-bold text-foreground">Gestion des Livraisons</h1>
+            <div>
+              <h1 className="text-xl font-semibold text-foreground tracking-tight">Livraisons</h1>
+              <p className="text-sm text-muted-foreground">{livraisons.length} livraisons au total</p>
+            </div>
           </div>
-          <Button onClick={() => setIsDialogOpen(true)}>
-            <Plus className="h-4 w-4 mr-2" />
-            Nouvelle Livraison
-          </Button>
+          <div className="flex items-center gap-3">
+            <ThemeToggle />
+            <Button 
+              onClick={() => setIsDialogOpen(true)}
+              className="rounded-full px-5"
+            >
+              <Plus className="h-4 w-4 mr-2" />
+              Nouvelle
+            </Button>
+          </div>
         </div>
       </header>
 
-      <main className="container mx-auto px-6 py-8">
-        {/* Stats */}
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
-          <Card>
-            <CardHeader className="flex flex-row items-center justify-between pb-2">
-              <CardTitle className="text-sm font-medium">Livraisons Aujourd'hui</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold">12</div>
-              <p className="text-xs text-muted-foreground">5 livreurs actifs</p>
-            </CardContent>
-          </Card>
-          <Card>
-            <CardHeader className="flex flex-row items-center justify-between pb-2">
-              <CardTitle className="text-sm font-medium">Taux de Réussite</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold">96%</div>
-              <p className="text-xs text-muted-foreground">Sur les 30 derniers jours</p>
-            </CardContent>
-          </Card>
-          <Card>
-            <CardHeader className="flex flex-row items-center justify-between pb-2">
-              <CardTitle className="text-sm font-medium">Délai Moyen</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold">45 min</div>
-              <p className="text-xs text-muted-foreground">Temps de livraison moyen</p>
-            </CardContent>
-          </Card>
+      <main className="max-w-7xl mx-auto px-8 py-8">
+        {/* Stats compactes */}
+        <div className="flex gap-4 mb-8">
+          <div className="flex items-center gap-3 px-5 py-3 rounded-2xl bg-info/10 border border-info/20">
+            <Clock className="h-5 w-5 text-info" />
+            <div>
+              <span className="text-2xl font-bold text-foreground">{enCoursCount}</span>
+              <span className="text-sm text-muted-foreground ml-2">en cours</span>
+            </div>
+          </div>
+          <div className="flex items-center gap-3 px-5 py-3 rounded-2xl bg-success/10 border border-success/20">
+            <CheckCircle className="h-5 w-5 text-success" />
+            <div>
+              <span className="text-2xl font-bold text-foreground">{livreesCount}</span>
+              <span className="text-sm text-muted-foreground ml-2">livrées</span>
+            </div>
+          </div>
+          <div className="flex items-center gap-3 px-5 py-3 rounded-2xl bg-secondary border border-border">
+            <Package className="h-5 w-5 text-muted-foreground" />
+            <div>
+              <span className="text-2xl font-bold text-foreground">{commandesPretes.length}</span>
+              <span className="text-sm text-muted-foreground ml-2">prêtes</span>
+            </div>
+          </div>
         </div>
 
-        <Card>
-          <CardHeader>
-            <div className="flex items-center justify-between">
-              <CardTitle>Liste des Livraisons</CardTitle>
-              <div className="flex items-center gap-2 w-80">
-                <Search className="h-4 w-4 text-muted-foreground" />
-                <Input
-                  placeholder="Rechercher par commande, client, livreur ou ville..."
-                  value={searchTerm}
-                  onChange={(e) => setSearchTerm(e.target.value)}
-                />
-              </div>
-            </div>
-          </CardHeader>
-          <CardContent>
-            <Table>
-              <TableHeader>
+        {/* Recherche */}
+        <div className="relative mb-6">
+          <Search className="absolute left-4 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+          <Input
+            placeholder="Rechercher par commande, client ou livreur..."
+            value={searchTerm}
+            onChange={(e) => setSearchTerm(e.target.value)}
+            className="pl-11 h-12 rounded-xl bg-card border-border/50 focus:border-primary"
+          />
+        </div>
+
+        {/* Table */}
+        <div className="rounded-2xl border border-border/50 bg-card overflow-hidden">
+          <Table>
+            <TableHeader>
+              <TableRow className="bg-muted/30 hover:bg-muted/30">
+                <TableHead className="font-medium">Commande</TableHead>
+                <TableHead className="font-medium">Client</TableHead>
+                <TableHead className="font-medium">Date</TableHead>
+                <TableHead className="font-medium">Livreur</TableHead>
+                <TableHead className="font-medium">Paiement</TableHead>
+                <TableHead className="font-medium">État</TableHead>
+                <TableHead className="text-right font-medium">Actions</TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {filteredLivraisons.length === 0 ? (
                 <TableRow>
-                  <TableHead>N° Commande</TableHead>
-                  <TableHead>Client</TableHead>
-                  <TableHead>Date Livraison</TableHead>
-                  <TableHead>Livreur</TableHead>
-                  <TableHead>Ville (CP)</TableHead>
-                  <TableHead>Mode Paiement</TableHead>
-                  <TableHead>État</TableHead>
-                  <TableHead className="text-right">Actions</TableHead>
+                  <TableCell colSpan={7} className="text-center py-12 text-muted-foreground">
+                    <Truck className="h-12 w-12 mx-auto mb-3 opacity-30" />
+                    <p>Aucune livraison trouvée</p>
+                  </TableCell>
                 </TableRow>
-              </TableHeader>
-              <TableBody>
-                {filteredLivraisons.map((livraison) => (
-                  <TableRow key={livraison.id}>
-                    <TableCell className="font-medium">{livraison.nocde}</TableCell>
+              ) : (
+                filteredLivraisons.map((livraison) => (
+                  <TableRow key={livraison.id} className="group hover:bg-muted/20">
+                    <TableCell className="font-mono font-medium text-primary">
+                      #{livraison.nocde}
+                    </TableCell>
                     <TableCell>
                       {livraison.commandes?.clients 
                         ? `${livraison.commandes.clients.nomclt} ${livraison.commandes.clients.prenomclt || ""}` 
-                        : "N/A"}
+                        : "—"}
+                    </TableCell>
+                    <TableCell className="text-muted-foreground">
+                      {livraison.dateliv ? new Date(livraison.dateliv).toLocaleDateString("fr-FR") : "—"}
                     </TableCell>
                     <TableCell>
-                      {livraison.dateliv ? new Date(livraison.dateliv).toLocaleDateString("fr-FR") : "N/A"}
+                      {livraison.personnel ? `${livraison.personnel.nompers}` : "—"}
+                    </TableCell>
+                    <TableCell className="text-muted-foreground text-sm">
+                      {livraison.modepay === "avant_livraison" ? "Avant" : livraison.modepay === "apres_livraison" ? "Après" : "—"}
                     </TableCell>
                     <TableCell>
-                      {livraison.personnel ? `${livraison.personnel.nompers} ${livraison.personnel.prenompers}` : "N/A"}
-                    </TableCell>
-                    <TableCell>{livraison.commandes?.clients?.adrclt || "N/A"}</TableCell>
-                    <TableCell>{livraison.modepay || "N/A"}</TableCell>
-                    <TableCell>
-                      <Badge className={`${getEtatColor(livraison.etatliv)} text-white`}>
+                      <Badge variant="outline" className={`${getEtatStyle(livraison.etatliv)} border rounded-full px-3`}>
                         {getEtatLabel(livraison.etatliv)}
                       </Badge>
                     </TableCell>
                     <TableCell className="text-right">
-                      <div className="flex justify-end gap-2">
-                        <Button variant="ghost" size="sm">
+                      <div className="flex justify-end gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                        <Button variant="ghost" size="icon" className="h-8 w-8 rounded-full">
                           <Edit className="h-4 w-4" />
                         </Button>
                         <Button 
                           variant="ghost" 
-                          size="sm"
+                          size="icon"
+                          className="h-8 w-8 rounded-full hover:bg-destructive/10"
                           onClick={() => handleDelete(livraison.id)}
                         >
                           <Trash2 className="h-4 w-4 text-destructive" />
@@ -251,135 +260,127 @@ const Livraisons = () => {
                       </div>
                     </TableCell>
                   </TableRow>
-                ))}
-              </TableBody>
-            </Table>
-          </CardContent>
-        </Card>
+                ))
+              )}
+            </TableBody>
+          </Table>
+        </div>
 
-        {/* Dialog d'ajout */}
-        <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
-          <DialogContent>
-            <DialogHeader>
-              <DialogTitle>Nouvelle Livraison</DialogTitle>
-              <DialogDescription>
-                Planifier une nouvelle livraison (seules les commandes "Prêtes" sont disponibles)
-              </DialogDescription>
-            </DialogHeader>
-            <Form {...form}>
-              <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
-                <FormField
-                  control={form.control}
-                  name="nocde"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>Commande *</FormLabel>
-                      <Select onValueChange={field.onChange} value={field.value}>
-                        <FormControl>
-                          <SelectTrigger>
-                            <SelectValue placeholder="Sélectionner une commande prête" />
-                          </SelectTrigger>
-                        </FormControl>
-                        <SelectContent>
-                          {commandesPretes.map((cmd) => (
-                            <SelectItem key={cmd.nocde} value={String(cmd.nocde)}>
-                              {cmd.nocde} - {cmd.clients ? `${cmd.clients.nomclt} ${cmd.clients.prenomclt || ""}` : "N/A"}
-                            </SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-                <FormField
-                  control={form.control}
-                  name="dateliv"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>Date de Livraison *</FormLabel>
-                      <FormControl>
-                        <Input type="date" {...field} />
-                      </FormControl>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-                <FormField
-                  control={form.control}
-                  name="livreur"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>Livreur *</FormLabel>
-                      <Select onValueChange={field.onChange} value={field.value}>
-                        <FormControl>
-                          <SelectTrigger>
-                            <SelectValue placeholder="Sélectionner un livreur" />
-                          </SelectTrigger>
-                        </FormControl>
-                        <SelectContent>
-                          {livreurs.map((liv) => (
-                            <SelectItem key={liv.idpers} value={String(liv.idpers)}>
-                              {liv.nompers} {liv.prenompers}
-                            </SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-                <FormField
-                  control={form.control}
-                  name="modepay"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>Mode de Paiement *</FormLabel>
-                      <Select onValueChange={field.onChange} value={field.value}>
-                        <FormControl>
-                          <SelectTrigger>
-                            <SelectValue placeholder="Sélectionner un mode" />
-                          </SelectTrigger>
-                        </FormControl>
-                        <SelectContent>
-                          {modesPaiement.map((mode) => (
-                            <SelectItem key={mode} value={mode}>
-                              {mode}
-                            </SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-                <div className="flex justify-end gap-2 pt-4">
-                  <Button
-                    type="button"
-                    variant="outline"
-                    onClick={() => setIsDialogOpen(false)}
-                  >
-                    Annuler
-                  </Button>
-                  <Button type="submit">Planifier la Livraison</Button>
-                </div>
-              </form>
-            </Form>
-          </DialogContent>
-        </Dialog>
-
-        {/* Contraintes importantes */}
-        <Card className="mt-6 border-warning">
-          <CardHeader>
-            <CardTitle className="text-warning">Règles de Gestion</CardTitle>
-          </CardHeader>
-          <CardContent className="space-y-2 text-sm">
-            <p>• Maximum 15 livraisons par livreur et par jour et par ville (code postal)</p>
-            <p>• Modifications avant 9h pour livraisons matin / avant 14h pour livraisons après-midi</p>
-            <p>• Seules les commandes "Prêtes" peuvent être ajoutées aux livraisons</p>
-          </CardContent>
-        </Card>
+        {/* Règles */}
+        <div className="mt-6 p-4 rounded-xl bg-warning/5 border border-warning/20">
+          <p className="text-sm text-warning font-medium mb-2">Règles de gestion</p>
+          <ul className="text-xs text-muted-foreground space-y-1">
+            <li>• Max 15 livraisons/livreur/jour/ville</li>
+            <li>• Modifications: avant 9h (matin) / 14h (après-midi)</li>
+          </ul>
+        </div>
       </main>
+
+      {/* Dialog */}
+      <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
+        <DialogContent className="rounded-2xl">
+          <DialogHeader>
+            <DialogTitle>Nouvelle Livraison</DialogTitle>
+            <DialogDescription>
+              Planifier une livraison pour une commande prête
+            </DialogDescription>
+          </DialogHeader>
+          <Form {...form}>
+            <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
+              <FormField
+                control={form.control}
+                name="nocde"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Commande</FormLabel>
+                    <Select onValueChange={field.onChange} value={field.value}>
+                      <FormControl>
+                        <SelectTrigger className="rounded-xl">
+                          <SelectValue placeholder="Sélectionner..." />
+                        </SelectTrigger>
+                      </FormControl>
+                      <SelectContent>
+                        {commandesPretes.map((cmd) => (
+                          <SelectItem key={cmd.nocde} value={String(cmd.nocde)}>
+                            #{cmd.nocde} - {cmd.clients?.nomclt || "N/A"}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+              <FormField
+                control={form.control}
+                name="dateliv"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Date</FormLabel>
+                    <FormControl>
+                      <Input type="date" {...field} className="rounded-xl" />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+              <FormField
+                control={form.control}
+                name="livreur"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Livreur</FormLabel>
+                    <Select onValueChange={field.onChange} value={field.value}>
+                      <FormControl>
+                        <SelectTrigger className="rounded-xl">
+                          <SelectValue placeholder="Sélectionner..." />
+                        </SelectTrigger>
+                      </FormControl>
+                      <SelectContent>
+                        {livreurs.map((liv) => (
+                          <SelectItem key={liv.idpers} value={String(liv.idpers)}>
+                            {liv.nompers} {liv.prenompers}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+              <FormField
+                control={form.control}
+                name="modepay"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Paiement</FormLabel>
+                    <Select onValueChange={field.onChange} value={field.value}>
+                      <FormControl>
+                        <SelectTrigger className="rounded-xl">
+                          <SelectValue placeholder="Sélectionner..." />
+                        </SelectTrigger>
+                      </FormControl>
+                      <SelectContent>
+                        <SelectItem value="avant_livraison">Avant livraison</SelectItem>
+                        <SelectItem value="apres_livraison">Après livraison</SelectItem>
+                      </SelectContent>
+                    </Select>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+              <div className="flex justify-end gap-3 pt-4">
+                <Button type="button" variant="ghost" onClick={() => setIsDialogOpen(false)}>
+                  Annuler
+                </Button>
+                <Button type="submit" className="rounded-full px-6">
+                  Planifier
+                </Button>
+              </div>
+            </form>
+          </Form>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 };
