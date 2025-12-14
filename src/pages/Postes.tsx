@@ -6,20 +6,10 @@ import * as z from "zod";
 import { usePostes } from "@/hooks/usePostes";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
 import {
   Dialog,
   DialogContent,
-  DialogDescription,
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
@@ -31,8 +21,8 @@ import {
   FormLabel,
   FormMessage,
 } from "@/components/ui/form";
-import { ArrowLeft, Plus, Search, Edit, Trash2, Briefcase } from "lucide-react";
-import { useToast } from "@/hooks/use-toast";
+import { ArrowLeft, Plus, Search, Trash2, Briefcase } from "lucide-react";
+import { ThemeToggle } from "@/components/ThemeToggle";
 
 const posteSchema = z.object({
   codeposte: z.string().min(1, "Code obligatoire"),
@@ -43,7 +33,6 @@ const posteSchema = z.object({
 
 const Postes = () => {
   const navigate = useNavigate();
-  const { toast } = useToast();
   const [searchTerm, setSearchTerm] = useState("");
   const [isDialogOpen, setIsDialogOpen] = useState(false);
 
@@ -51,12 +40,7 @@ const Postes = () => {
 
   const form = useForm<z.infer<typeof posteSchema>>({
     resolver: zodResolver(posteSchema),
-    defaultValues: {
-      codeposte: "",
-      libelle: "",
-      indice: 5,
-      description: "",
-    },
+    defaultValues: { codeposte: "", libelle: "", indice: 5, description: "" },
   });
 
   const filteredPostes = postes.filter(
@@ -66,264 +50,140 @@ const Postes = () => {
   );
 
   const getIndiceBadge = (indice: number) => {
-    if (indice >= 7) return <Badge className="bg-destructive text-destructive-foreground">Élevé</Badge>;
-    if (indice >= 5) return <Badge className="bg-warning text-warning-foreground">Moyen</Badge>;
-    return <Badge className="bg-info text-info-foreground">Base</Badge>;
+    if (indice >= 7) return <Badge className="bg-destructive/20 text-destructive border-destructive/40 border rounded-full">Élevé</Badge>;
+    if (indice >= 5) return <Badge className="bg-warning/20 text-warning border-warning/40 border rounded-full">Moyen</Badge>;
+    return <Badge className="bg-info/20 text-info border-info/40 border rounded-full">Base</Badge>;
   };
 
   const onSubmit = (data: z.infer<typeof posteSchema>) => {
-    addPoste({
-      codeposte: data.codeposte,
-      libelle: data.libelle,
-      indice: data.indice,
-      description: data.description,
-    });
+    addPoste({ codeposte: data.codeposte, libelle: data.libelle, indice: data.indice, description: data.description });
     setIsDialogOpen(false);
     form.reset();
   };
 
-  const handleDelete = (codeposte: string) => {
-    deletePoste(codeposte);
-  };
+  const handleDelete = (codeposte: string) => deletePoste(codeposte);
 
   if (isLoading) {
     return (
       <div className="min-h-screen bg-background flex items-center justify-center">
-        <p>Chargement...</p>
+        <div className="w-8 h-8 border-4 border-primary border-t-transparent rounded-full animate-spin" />
       </div>
     );
   }
 
   return (
-    <div className="min-h-screen bg-background">
-      <header className="bg-card border-b border-border sticky top-0 z-50 shadow-sm">
-        <div className="container mx-auto px-6 py-4 flex items-center justify-between">
-          <div className="flex items-center gap-3">
-            <Button variant="ghost" size="sm" onClick={() => navigate("/dashboard")}>
-              <ArrowLeft className="h-4 w-4" />
+    <div className="min-h-screen bg-background relative overflow-hidden">
+      <div className="fixed bottom-0 right-0 w-[500px] h-[500px] bg-primary/10 rounded-full blur-[150px] translate-y-1/2 translate-x-1/3 pointer-events-none" />
+
+      <header className="sticky top-0 z-50 glass border-b border-border/30">
+        <div className="max-w-7xl mx-auto px-6 py-4 flex items-center justify-between">
+          <div className="flex items-center gap-4">
+            <Button variant="ghost" size="icon" onClick={() => navigate("/dashboard")} className="rounded-xl">
+              <ArrowLeft className="h-5 w-5" />
             </Button>
-            <Briefcase className="h-6 w-6 text-primary" />
-            <h1 className="text-2xl font-bold text-foreground">Gestion des Postes</h1>
+            <div>
+              <h1 className="text-lg font-bold text-foreground">Postes</h1>
+              <p className="text-xs text-muted-foreground">{postes.length} postes</p>
+            </div>
           </div>
-          <Button onClick={() => setIsDialogOpen(true)}>
-            <Plus className="h-4 w-4 mr-2" />
-            Nouveau Poste
-          </Button>
+          <div className="flex items-center gap-3">
+            <ThemeToggle />
+            <Button onClick={() => setIsDialogOpen(true)} className="rounded-xl bg-gradient-to-r from-primary to-accent glow-primary">
+              <Plus className="h-4 w-4 mr-2" />
+              Nouveau
+            </Button>
+          </div>
         </div>
       </header>
 
-      <main className="container mx-auto px-6 py-8">
-        {/* Stats */}
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
-          <Card>
-            <CardHeader className="flex flex-row items-center justify-between pb-2">
-              <CardTitle className="text-sm font-medium">Postes Définis</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold">4</div>
-              <p className="text-xs text-muted-foreground">Types de postes</p>
-            </CardContent>
-          </Card>
-          <Card>
-            <CardHeader className="flex flex-row items-center justify-between pb-2">
-              <CardTitle className="text-sm font-medium">Total Employés</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold">34</div>
-              <p className="text-xs text-muted-foreground">Tous postes confondus</p>
-            </CardContent>
-          </Card>
-          <Card>
-            <CardHeader className="flex flex-row items-center justify-between pb-2">
-              <CardTitle className="text-sm font-medium">Indice Moyen</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold">321</div>
-              <p className="text-xs text-muted-foreground">Base de calcul</p>
-            </CardContent>
-          </Card>
+      <main className="max-w-7xl mx-auto px-6 py-8 relative">
+        <div className="relative mb-6">
+          <Search className="absolute left-4 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+          <Input
+            placeholder="Rechercher par code ou libellé..."
+            value={searchTerm}
+            onChange={(e) => setSearchTerm(e.target.value)}
+            className="pl-11 h-12 rounded-2xl glass border-border/50 focus:border-primary"
+          />
         </div>
 
-        <Card>
-          <CardHeader>
-            <div className="flex items-center justify-between">
-              <CardTitle>Liste des Postes</CardTitle>
-              <div className="flex items-center gap-2 w-80">
-                <Search className="h-4 w-4 text-muted-foreground" />
-                <Input
-                  placeholder="Rechercher par code ou libellé..."
-                  value={searchTerm}
-                  onChange={(e) => setSearchTerm(e.target.value)}
-                />
-              </div>
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+          {filteredPostes.length === 0 ? (
+            <div className="col-span-full glass rounded-2xl p-12 text-center">
+              <Briefcase className="h-16 w-16 mx-auto mb-4 text-muted-foreground/30" />
+              <p className="text-muted-foreground">Aucun poste trouvé</p>
             </div>
-          </CardHeader>
-          <CardContent>
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>Code Poste</TableHead>
-                  <TableHead>Libellé</TableHead>
-                  <TableHead>Description</TableHead>
-                  <TableHead>Indice</TableHead>
-                  <TableHead>Niveau</TableHead>
-                  <TableHead>Nb Employés</TableHead>
-                  <TableHead className="text-right">Actions</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {filteredPostes.map((poste) => (
-                  <TableRow key={poste.codeposte}>
-                    <TableCell className="font-medium">{poste.codeposte}</TableCell>
-                    <TableCell className="font-semibold">{poste.libelle}</TableCell>
-                    <TableCell className="text-muted-foreground">{poste.description || "N/A"}</TableCell>
-                    <TableCell className="font-mono">{poste.indice}</TableCell>
-                    <TableCell>{getIndiceBadge(poste.indice)}</TableCell>
-                    <TableCell>
-                      <Badge variant="outline">0 employés</Badge>
-                    </TableCell>
-                    <TableCell className="text-right">
-                      <div className="flex justify-end gap-2">
-                        <Button variant="ghost" size="sm">
-                          <Edit className="h-4 w-4" />
-                        </Button>
-                        <Button 
-                          variant="ghost" 
-                          size="sm"
-                          onClick={() => handleDelete(poste.codeposte)}
-                        >
-                          <Trash2 className="h-4 w-4 text-destructive" />
-                        </Button>
-                      </div>
-                    </TableCell>
-                  </TableRow>
-                ))}
-              </TableBody>
-            </Table>
-          </CardContent>
-        </Card>
-
-        {/* Info sur les postes et leurs autorisations */}
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mt-6">
-          <Card>
-            <CardHeader>
-              <CardTitle>Répartition des Effectifs</CardTitle>
-            </CardHeader>
-            <CardContent className="space-y-3">
-              {postes.map((poste) => (
-                <div key={poste.codeposte} className="flex justify-between items-center">
-                  <span className="text-sm font-medium">{poste.libelle}</span>
-                  <div className="flex items-center gap-2">
-                    <div className="w-32 h-2 bg-secondary rounded-full overflow-hidden">
-                      <div
-                        className="h-full bg-primary"
-                        style={{ width: "0%" }}
-                      />
-                    </div>
-                    <span className="text-sm text-muted-foreground w-12 text-right">
-                      0
-                    </span>
+          ) : (
+            filteredPostes.map((poste) => (
+              <div key={poste.codeposte} className="glass rounded-2xl p-5 hover:shadow-lg transition-all group">
+                <div className="flex items-start justify-between mb-4">
+                  <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-primary/20 to-accent/20 flex items-center justify-center">
+                    <Briefcase className="h-6 w-6 text-primary" />
                   </div>
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    className="h-8 w-8 rounded-xl opacity-0 group-hover:opacity-100 transition-opacity hover:bg-destructive/10"
+                    onClick={() => handleDelete(poste.codeposte)}
+                  >
+                    <Trash2 className="h-4 w-4 text-destructive" />
+                  </Button>
                 </div>
-              ))}
-            </CardContent>
-          </Card>
-
-          <Card>
-            <CardHeader>
-              <CardTitle>Modules par Rôle</CardTitle>
-            </CardHeader>
-            <CardContent className="space-y-4 text-sm">
-              <div>
-                <p className="font-semibold mb-1">Administrateur</p>
-                <p className="text-muted-foreground">Accès complet à tous les modules</p>
+                
+                <p className="font-mono text-sm text-primary mb-1">{poste.codeposte}</p>
+                <p className="font-semibold text-foreground mb-2">{poste.libelle}</p>
+                <p className="text-sm text-muted-foreground mb-4 line-clamp-2">{poste.description || "Aucune description"}</p>
+                
+                <div className="flex items-center justify-between">
+                  {getIndiceBadge(poste.indice)}
+                  <span className="font-mono text-sm text-muted-foreground">Indice {poste.indice}</span>
+                </div>
               </div>
-              <div>
-                <p className="font-semibold mb-1">Magasinier</p>
-                <p className="text-muted-foreground">Articles, Commandes</p>
-              </div>
-              <div>
-                <p className="font-semibold mb-1">Chef Livreur</p>
-                <p className="text-muted-foreground">Livraisons uniquement</p>
-              </div>
-              <div>
-                <p className="font-semibold mb-1">Livreur</p>
-                <p className="text-muted-foreground">Consultation livraisons</p>
-              </div>
-            </CardContent>
-          </Card>
+            ))
+          )}
         </div>
       </main>
 
       <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
-        <DialogContent className="max-w-xl">
+        <DialogContent className="glass-strong rounded-3xl border-border/50 max-w-md">
           <DialogHeader>
-            <DialogTitle>Nouveau Poste</DialogTitle>
-            <DialogDescription>
-              Définir un nouveau poste dans l'entreprise
-            </DialogDescription>
+            <DialogTitle className="text-xl font-bold">Nouveau Poste</DialogTitle>
           </DialogHeader>
           <Form {...form}>
             <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
               <div className="grid grid-cols-2 gap-4">
-                <FormField
-                  control={form.control}
-                  name="codeposte"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>Code Poste</FormLabel>
-                      <FormControl>
-                        <Input placeholder="P005" {...field} />
-                      </FormControl>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-                <FormField
-                  control={form.control}
-                  name="indice"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>Indice</FormLabel>
-                      <FormControl>
-                        <Input type="number" {...field} />
-                      </FormControl>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
+                <FormField control={form.control} name="codeposte" render={({ field }) => (
+                  <FormItem>
+                    <FormLabel className="text-muted-foreground">Code</FormLabel>
+                    <FormControl><Input placeholder="P005" {...field} className="h-11 rounded-xl bg-secondary/50 border-border/50" /></FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )} />
+                <FormField control={form.control} name="indice" render={({ field }) => (
+                  <FormItem>
+                    <FormLabel className="text-muted-foreground">Indice</FormLabel>
+                    <FormControl><Input type="number" {...field} className="h-11 rounded-xl bg-secondary/50 border-border/50" /></FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )} />
               </div>
-              <FormField
-                control={form.control}
-                name="libelle"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Libellé</FormLabel>
-                    <FormControl>
-                      <Input placeholder="Responsable Logistique" {...field} />
-                    </FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-              <FormField
-                control={form.control}
-                name="description"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Description</FormLabel>
-                    <FormControl>
-                      <Input placeholder="Gestion de la logistique et des livraisons" {...field} />
-                    </FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-              <div className="flex justify-end gap-2">
-                <Button type="button" variant="outline" onClick={() => setIsDialogOpen(false)}>
-                  Annuler
-                </Button>
-                <Button type="submit">Ajouter</Button>
+              <FormField control={form.control} name="libelle" render={({ field }) => (
+                <FormItem>
+                  <FormLabel className="text-muted-foreground">Libellé</FormLabel>
+                  <FormControl><Input placeholder="Responsable Logistique" {...field} className="h-11 rounded-xl bg-secondary/50 border-border/50" /></FormControl>
+                  <FormMessage />
+                </FormItem>
+              )} />
+              <FormField control={form.control} name="description" render={({ field }) => (
+                <FormItem>
+                  <FormLabel className="text-muted-foreground">Description</FormLabel>
+                  <FormControl><Input placeholder="Gestion de la logistique" {...field} className="h-11 rounded-xl bg-secondary/50 border-border/50" /></FormControl>
+                  <FormMessage />
+                </FormItem>
+              )} />
+              <div className="flex gap-3 pt-4">
+                <Button type="button" variant="ghost" onClick={() => setIsDialogOpen(false)} className="flex-1 h-12 rounded-xl">Annuler</Button>
+                <Button type="submit" className="flex-1 h-12 rounded-xl bg-gradient-to-r from-primary to-accent glow-primary">Ajouter</Button>
               </div>
             </form>
           </Form>

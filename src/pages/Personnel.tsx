@@ -7,20 +7,10 @@ import { usePersonnel } from "@/hooks/usePersonnel";
 import { usePostes } from "@/hooks/usePostes";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
 import {
   Dialog,
   DialogContent,
-  DialogDescription,
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
@@ -39,8 +29,8 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { ArrowLeft, Plus, Search, Edit, Trash2, UserCog, Shield } from "lucide-react";
-import { useToast } from "@/hooks/use-toast";
+import { ArrowLeft, Plus, Search, Trash2, UserCog } from "lucide-react";
+import { ThemeToggle } from "@/components/ThemeToggle";
 
 const personnelSchema = z.object({
   nompers: z.string().min(2, "Nom minimum 2 caractères"),
@@ -56,7 +46,6 @@ const personnelSchema = z.object({
 
 const Personnel = () => {
   const navigate = useNavigate();
-  const { toast } = useToast();
   const [searchTerm, setSearchTerm] = useState("");
   const [isDialogOpen, setIsDialogOpen] = useState(false);
 
@@ -66,15 +55,8 @@ const Personnel = () => {
   const form = useForm<z.infer<typeof personnelSchema>>({
     resolver: zodResolver(personnelSchema),
     defaultValues: {
-      nompers: "",
-      prenompers: "",
-      adrpers: "",
-      villepers: "",
-      telpers: 0,
-      d_embauche: new Date().toISOString().split('T')[0],
-      login: "",
-      motp: "",
-      codeposte: "",
+      nompers: "", prenompers: "", adrpers: "", villepers: "", telpers: 0,
+      d_embauche: new Date().toISOString().split('T')[0], login: "", motp: "", codeposte: "",
     },
   });
 
@@ -83,341 +65,199 @@ const Personnel = () => {
       pers.idpers.toString().includes(searchTerm) ||
       pers.nompers.toLowerCase().includes(searchTerm.toLowerCase()) ||
       pers.prenompers.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      (pers.login || "").toLowerCase().includes(searchTerm.toLowerCase()) ||
-      (pers.postes?.libelle || "").toLowerCase().includes(searchTerm.toLowerCase())
+      (pers.login || "").toLowerCase().includes(searchTerm.toLowerCase())
   );
 
   const getRoleBadge = (libelle: string | undefined) => {
-    if (!libelle) return <Badge variant="outline">N/A</Badge>;
-    switch (libelle) {
-      case "Administrateur":
-        return <Badge className="bg-destructive text-destructive-foreground">Admin</Badge>;
-      case "Chef Livreur":
-        return <Badge className="bg-warning text-warning-foreground">Chef</Badge>;
-      case "Magasinier":
-        return <Badge className="bg-info text-info-foreground">Magasin</Badge>;
-      case "Livreur":
-        return <Badge className="bg-success text-success-foreground">Livreur</Badge>;
-      default:
-        return <Badge variant="outline">{libelle}</Badge>;
-    }
+    const styles: Record<string, string> = {
+      "Administrateur": "bg-destructive/20 text-destructive border-destructive/40",
+      "Chef Livreur": "bg-warning/20 text-warning border-warning/40",
+      "Magasinier": "bg-info/20 text-info border-info/40",
+      "Livreur": "bg-success/20 text-success border-success/40",
+    };
+    return <Badge variant="outline" className={`${styles[libelle || ""] || "bg-muted text-muted-foreground"} border rounded-full`}>{libelle || "N/A"}</Badge>;
   };
 
   const onSubmit = (data: z.infer<typeof personnelSchema>) => {
-    addPersonnel({
-      nompers: data.nompers,
-      prenompers: data.prenompers,
-      adrpers: data.adrpers,
-      villepers: data.villepers,
-      telpers: data.telpers,
-      d_embauche: data.d_embauche,
-      login: data.login,
-      motp: data.motp,
-      codeposte: data.codeposte,
-    });
+    addPersonnel({ nompers: data.nompers, prenompers: data.prenompers, adrpers: data.adrpers, villepers: data.villepers, telpers: data.telpers, d_embauche: data.d_embauche, login: data.login, motp: data.motp, codeposte: data.codeposte });
     setIsDialogOpen(false);
     form.reset();
   };
 
-  const handleDelete = (idpers: number) => {
-    deletePersonnel(idpers);
-  };
+  const handleDelete = (idpers: number) => deletePersonnel(idpers);
 
   if (isLoading || postesLoading) {
     return (
       <div className="min-h-screen bg-background flex items-center justify-center">
-        <p>Chargement...</p>
+        <div className="w-8 h-8 border-4 border-primary border-t-transparent rounded-full animate-spin" />
       </div>
     );
   }
 
   return (
-    <div className="min-h-screen bg-background">
-      <header className="bg-card border-b border-border sticky top-0 z-50 shadow-sm">
-        <div className="container mx-auto px-6 py-4 flex items-center justify-between">
-          <div className="flex items-center gap-3">
-            <Button variant="ghost" size="sm" onClick={() => navigate("/dashboard")}>
-              <ArrowLeft className="h-4 w-4" />
+    <div className="min-h-screen bg-background relative overflow-hidden">
+      <div className="fixed top-0 left-0 w-[500px] h-[500px] bg-accent/10 rounded-full blur-[150px] -translate-y-1/2 -translate-x-1/3 pointer-events-none" />
+
+      <header className="sticky top-0 z-50 glass border-b border-border/30">
+        <div className="max-w-7xl mx-auto px-6 py-4 flex items-center justify-between">
+          <div className="flex items-center gap-4">
+            <Button variant="ghost" size="icon" onClick={() => navigate("/dashboard")} className="rounded-xl">
+              <ArrowLeft className="h-5 w-5" />
             </Button>
-            <UserCog className="h-6 w-6 text-primary" />
-            <h1 className="text-2xl font-bold text-foreground">Gestion du Personnel</h1>
+            <div>
+              <h1 className="text-lg font-bold text-foreground">Personnel</h1>
+              <p className="text-xs text-muted-foreground">{personnel.length} employés</p>
+            </div>
           </div>
-          <Button onClick={() => setIsDialogOpen(true)}>
-            <Plus className="h-4 w-4 mr-2" />
-            Nouvel Employé
-          </Button>
+          <div className="flex items-center gap-3">
+            <ThemeToggle />
+            <Button onClick={() => setIsDialogOpen(true)} className="rounded-xl bg-gradient-to-r from-primary to-accent glow-primary">
+              <Plus className="h-4 w-4 mr-2" />
+              Nouveau
+            </Button>
+          </div>
         </div>
       </header>
 
-      <main className="container mx-auto px-6 py-8">
-        {/* Stats */}
-        <div className="grid grid-cols-1 md:grid-cols-4 gap-6 mb-8">
-          <Card>
-            <CardHeader className="flex flex-row items-center justify-between pb-2">
-              <CardTitle className="text-sm font-medium">Total Employés</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold">34</div>
-              <p className="text-xs text-muted-foreground">Tous postes confondus</p>
-            </CardContent>
-          </Card>
-          <Card>
-            <CardHeader className="flex flex-row items-center justify-between pb-2">
-              <CardTitle className="text-sm font-medium">Livreurs Actifs</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold">12</div>
-              <p className="text-xs text-muted-foreground">Sur le terrain</p>
-            </CardContent>
-          </Card>
-          <Card>
-            <CardHeader className="flex flex-row items-center justify-between pb-2">
-              <CardTitle className="text-sm font-medium">Magasiniers</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold">8</div>
-              <p className="text-xs text-muted-foreground">Gestion stock</p>
-            </CardContent>
-          </Card>
-          <Card>
-            <CardHeader className="flex flex-row items-center justify-between pb-2">
-              <CardTitle className="text-sm font-medium">Administrateurs</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold">3</div>
-              <p className="text-xs text-muted-foreground">Accès complet</p>
-            </CardContent>
-          </Card>
+      <main className="max-w-7xl mx-auto px-6 py-8 relative">
+        <div className="relative mb-6">
+          <Search className="absolute left-4 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+          <Input
+            placeholder="Rechercher par nom, login..."
+            value={searchTerm}
+            onChange={(e) => setSearchTerm(e.target.value)}
+            className="pl-11 h-12 rounded-2xl glass border-border/50 focus:border-primary"
+          />
         </div>
 
-        <Card>
-          <CardHeader>
-            <div className="flex items-center justify-between">
-              <CardTitle>Liste des Employés</CardTitle>
-              <div className="flex items-center gap-2 w-80">
-                <Search className="h-4 w-4 text-muted-foreground" />
-                <Input
-                  placeholder="Rechercher par nom, login ou poste..."
-                  value={searchTerm}
-                  onChange={(e) => setSearchTerm(e.target.value)}
-                />
-              </div>
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+          {filteredPersonnel.length === 0 ? (
+            <div className="col-span-full glass rounded-2xl p-12 text-center">
+              <UserCog className="h-16 w-16 mx-auto mb-4 text-muted-foreground/30" />
+              <p className="text-muted-foreground">Aucun employé trouvé</p>
             </div>
-          </CardHeader>
-          <CardContent>
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>ID</TableHead>
-                  <TableHead>Nom</TableHead>
-                  <TableHead>Prénom</TableHead>
-                  <TableHead>Login</TableHead>
-                  <TableHead>Ville</TableHead>
-                  <TableHead>Téléphone</TableHead>
-                  <TableHead>Date Embauche</TableHead>
-                  <TableHead>Poste</TableHead>
-                  <TableHead className="text-right">Actions</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {filteredPersonnel.map((pers) => (
-                  <TableRow key={pers.idpers}>
-                    <TableCell className="font-medium">{pers.idpers}</TableCell>
-                    <TableCell>{pers.nompers}</TableCell>
-                    <TableCell>{pers.prenompers}</TableCell>
-                    <TableCell>
-                      <div className="flex items-center gap-1">
-                        <Shield className="h-3 w-3 text-muted-foreground" />
-                        <span className="font-mono text-sm">{pers.login}</span>
-                      </div>
-                    </TableCell>
-                    <TableCell>{pers.villepers}</TableCell>
-                    <TableCell>{pers.telpers}</TableCell>
-                    <TableCell>
-                      {pers.d_embauche ? new Date(pers.d_embauche).toLocaleDateString("fr-FR") : "N/A"}
-                    </TableCell>
-                    <TableCell>{getRoleBadge(pers.postes?.libelle)}</TableCell>
-                    <TableCell className="text-right">
-                      <div className="flex justify-end gap-2">
-                        <Button variant="ghost" size="sm">
-                          <Edit className="h-4 w-4" />
-                        </Button>
-                        <Button variant="ghost" size="sm" onClick={() => handleDelete(pers.idpers)}>
-                          <Trash2 className="h-4 w-4 text-destructive" />
-                        </Button>
-                      </div>
-                    </TableCell>
-                  </TableRow>
-                ))}
-              </TableBody>
-            </Table>
-          </CardContent>
-        </Card>
-
-        {/* Règles de gestion */}
-        <Card className="mt-6 border-warning">
-          <CardHeader>
-            <CardTitle className="text-warning">Règles de Gestion</CardTitle>
-          </CardHeader>
-          <CardContent className="space-y-2 text-sm">
-            <p>• Login et mot de passe obligatoires pour l'authentification</p>
-            <p>• Vérification du format du numéro de téléphone obligatoire</p>
-            <p>• Chaque employé doit être associé à un poste (codeposte)</p>
-          </CardContent>
-        </Card>
+          ) : (
+            filteredPersonnel.map((pers) => (
+              <div key={pers.idpers} className="glass rounded-2xl p-5 hover:shadow-lg transition-all group">
+                <div className="flex items-start justify-between mb-4">
+                  <div className="w-12 h-12 rounded-full bg-gradient-to-br from-primary/20 to-accent/20 flex items-center justify-center text-lg font-bold text-primary">
+                    {pers.prenompers.charAt(0)}{pers.nompers.charAt(0)}
+                  </div>
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    className="h-8 w-8 rounded-xl opacity-0 group-hover:opacity-100 transition-opacity hover:bg-destructive/10"
+                    onClick={() => handleDelete(pers.idpers)}
+                  >
+                    <Trash2 className="h-4 w-4 text-destructive" />
+                  </Button>
+                </div>
+                
+                <p className="font-semibold text-foreground">{pers.prenompers} {pers.nompers}</p>
+                <p className="font-mono text-xs text-muted-foreground mb-3">@{pers.login}</p>
+                
+                <div className="flex items-center justify-between">
+                  {getRoleBadge(pers.postes?.libelle)}
+                  <span className="text-xs text-muted-foreground">{pers.villepers}</span>
+                </div>
+              </div>
+            ))
+          )}
+        </div>
       </main>
 
       <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
-        <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
+        <DialogContent className="glass-strong rounded-3xl border-border/50 max-w-xl max-h-[90vh] overflow-y-auto">
           <DialogHeader>
-            <DialogTitle>Nouvel Employé</DialogTitle>
-            <DialogDescription>
-              Ajouter un nouvel employé au personnel
-            </DialogDescription>
+            <DialogTitle className="text-xl font-bold">Nouvel Employé</DialogTitle>
           </DialogHeader>
           <Form {...form}>
             <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
               <div className="grid grid-cols-2 gap-4">
-                <FormField
-                  control={form.control}
-                  name="login"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>Login</FormLabel>
-                      <FormControl>
-                        <Input placeholder="jdupont" {...field} />
-                      </FormControl>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-                <FormField
-                  control={form.control}
-                  name="motp"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>Mot de passe</FormLabel>
-                      <FormControl>
-                        <Input type="password" placeholder="pass1234" {...field} />
-                      </FormControl>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-              </div>
-              <div className="grid grid-cols-2 gap-4">
-                <FormField
-                  control={form.control}
-                  name="nompers"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>Nom</FormLabel>
-                      <FormControl>
-                        <Input placeholder="Dupont" {...field} />
-                      </FormControl>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-                <FormField
-                  control={form.control}
-                  name="prenompers"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>Prénom</FormLabel>
-                      <FormControl>
-                        <Input placeholder="Jean" {...field} />
-                      </FormControl>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-              </div>
-              <FormField
-                control={form.control}
-                name="adrpers"
-                render={({ field }) => (
+                <FormField control={form.control} name="login" render={({ field }) => (
                   <FormItem>
-                    <FormLabel>Adresse</FormLabel>
-                    <FormControl>
-                      <Input placeholder="15 Rue de la Paix" {...field} />
-                    </FormControl>
+                    <FormLabel className="text-muted-foreground">Login</FormLabel>
+                    <FormControl><Input placeholder="jdupont" {...field} className="h-11 rounded-xl bg-secondary/50 border-border/50" /></FormControl>
                     <FormMessage />
                   </FormItem>
-                )}
-              />
-              <div className="grid grid-cols-2 gap-4">
-                <FormField
-                  control={form.control}
-                  name="villepers"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>Ville</FormLabel>
-                      <FormControl>
-                        <Input placeholder="Paris" {...field} />
-                      </FormControl>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-                <FormField
-                  control={form.control}
-                  name="telpers"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>Téléphone</FormLabel>
-                      <FormControl>
-                        <Input type="number" placeholder="20373057" {...field} />
-                      </FormControl>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
+                )} />
+                <FormField control={form.control} name="motp" render={({ field }) => (
+                  <FormItem>
+                    <FormLabel className="text-muted-foreground">Mot de passe</FormLabel>
+                    <FormControl><Input type="password" placeholder="••••••••" {...field} className="h-11 rounded-xl bg-secondary/50 border-border/50" /></FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )} />
               </div>
               <div className="grid grid-cols-2 gap-4">
-                <FormField
-                  control={form.control}
-                  name="d_embauche"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>Date Embauche</FormLabel>
-                      <FormControl>
-                        <Input type="date" {...field} />
-                      </FormControl>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-                <FormField
-                  control={form.control}
-                  name="codeposte"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>Poste</FormLabel>
-                      <Select onValueChange={field.onChange} defaultValue={field.value}>
-                        <FormControl>
-                          <SelectTrigger>
-                            <SelectValue placeholder="Sélectionner un poste" />
-                          </SelectTrigger>
-                        </FormControl>
-                        <SelectContent>
-                          {postes.map((poste) => (
-                            <SelectItem key={poste.codeposte} value={poste.codeposte}>
-                              {poste.libelle}
-                            </SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
+                <FormField control={form.control} name="nompers" render={({ field }) => (
+                  <FormItem>
+                    <FormLabel className="text-muted-foreground">Nom</FormLabel>
+                    <FormControl><Input placeholder="Dupont" {...field} className="h-11 rounded-xl bg-secondary/50 border-border/50" /></FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )} />
+                <FormField control={form.control} name="prenompers" render={({ field }) => (
+                  <FormItem>
+                    <FormLabel className="text-muted-foreground">Prénom</FormLabel>
+                    <FormControl><Input placeholder="Jean" {...field} className="h-11 rounded-xl bg-secondary/50 border-border/50" /></FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )} />
               </div>
-              <div className="flex justify-end gap-2">
-                <Button type="button" variant="outline" onClick={() => setIsDialogOpen(false)}>
-                  Annuler
-                </Button>
-                <Button type="submit">Ajouter</Button>
+              <FormField control={form.control} name="adrpers" render={({ field }) => (
+                <FormItem>
+                  <FormLabel className="text-muted-foreground">Adresse</FormLabel>
+                  <FormControl><Input placeholder="15 Rue de la Paix" {...field} className="h-11 rounded-xl bg-secondary/50 border-border/50" /></FormControl>
+                  <FormMessage />
+                </FormItem>
+              )} />
+              <div className="grid grid-cols-2 gap-4">
+                <FormField control={form.control} name="villepers" render={({ field }) => (
+                  <FormItem>
+                    <FormLabel className="text-muted-foreground">Ville</FormLabel>
+                    <FormControl><Input placeholder="Paris" {...field} className="h-11 rounded-xl bg-secondary/50 border-border/50" /></FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )} />
+                <FormField control={form.control} name="telpers" render={({ field }) => (
+                  <FormItem>
+                    <FormLabel className="text-muted-foreground">Téléphone</FormLabel>
+                    <FormControl><Input type="number" placeholder="0612345678" {...field} className="h-11 rounded-xl bg-secondary/50 border-border/50" /></FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )} />
+              </div>
+              <div className="grid grid-cols-2 gap-4">
+                <FormField control={form.control} name="d_embauche" render={({ field }) => (
+                  <FormItem>
+                    <FormLabel className="text-muted-foreground">Date Embauche</FormLabel>
+                    <FormControl><Input type="date" {...field} className="h-11 rounded-xl bg-secondary/50 border-border/50" /></FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )} />
+                <FormField control={form.control} name="codeposte" render={({ field }) => (
+                  <FormItem>
+                    <FormLabel className="text-muted-foreground">Poste</FormLabel>
+                    <Select onValueChange={field.onChange} defaultValue={field.value}>
+                      <FormControl>
+                        <SelectTrigger className="h-11 rounded-xl bg-secondary/50 border-border/50">
+                          <SelectValue placeholder="Sélectionner" />
+                        </SelectTrigger>
+                      </FormControl>
+                      <SelectContent>
+                        {postes.map((poste) => (
+                          <SelectItem key={poste.codeposte} value={poste.codeposte}>{poste.libelle}</SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                    <FormMessage />
+                  </FormItem>
+                )} />
+              </div>
+              <div className="flex gap-3 pt-4">
+                <Button type="button" variant="ghost" onClick={() => setIsDialogOpen(false)} className="flex-1 h-12 rounded-xl">Annuler</Button>
+                <Button type="submit" className="flex-1 h-12 rounded-xl bg-gradient-to-r from-primary to-accent glow-primary">Ajouter</Button>
               </div>
             </form>
           </Form>

@@ -5,20 +5,10 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import * as z from "zod";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
 import {
   Dialog,
   DialogContent,
-  DialogDescription,
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
@@ -30,7 +20,7 @@ import {
   FormLabel,
   FormMessage,
 } from "@/components/ui/form";
-import { ArrowLeft, Plus, Search, Edit, Trash2, Package } from "lucide-react";
+import { ArrowLeft, Plus, Search, Trash2, Package } from "lucide-react";
 import { useArticles } from "@/hooks/useArticles";
 import { ThemeToggle } from "@/components/ThemeToggle";
 
@@ -55,15 +45,7 @@ const Articles = () => {
 
   const form = useForm<z.infer<typeof articleSchema>>({
     resolver: zodResolver(articleSchema),
-    defaultValues: {
-      refart: "",
-      designation: "",
-      prixa: 0,
-      prixv: 0,
-      codetva: 20,
-      categorie: "",
-      qtestk: 0,
-    },
+    defaultValues: { refart: "", designation: "", prixa: 0, prixv: 0, codetva: 20, categorie: "", qtestk: 0 },
   });
 
   const filteredArticles = articles.filter(
@@ -74,179 +56,107 @@ const Articles = () => {
   );
 
   const getStockBadge = (qte: number) => {
-    if (qte === 0) return <Badge variant="destructive">Rupture</Badge>;
-    if (qte < 10) return <Badge className="bg-warning text-warning-foreground">Stock Bas</Badge>;
-    return <Badge className="bg-success text-success-foreground">En Stock</Badge>;
+    if (qte === 0) return <Badge className="bg-destructive/20 text-destructive border-destructive/40 border rounded-full">Rupture</Badge>;
+    if (qte < 10) return <Badge className="bg-warning/20 text-warning border-warning/40 border rounded-full">Stock Bas</Badge>;
+    return <Badge className="bg-success/20 text-success border-success/40 border rounded-full">En Stock</Badge>;
   };
 
   const onSubmit = (data: z.infer<typeof articleSchema>) => {
-    if (articles.some(a => a.refart === data.refart)) {
-      return;
-    }
-
-    addArticle({
-      refart: data.refart,
-      designation: data.designation,
-      prixa: data.prixa,
-      prixv: data.prixv,
-      codetva: data.codetva,
-      categorie: data.categorie,
-      qtestk: data.qtestk,
-    });
+    if (articles.some(a => a.refart === data.refart)) return;
+    addArticle({ refart: data.refart, designation: data.designation, prixa: data.prixa, prixv: data.prixv, codetva: data.codetva, categorie: data.categorie, qtestk: data.qtestk });
     setIsDialogOpen(false);
     form.reset();
   };
 
-  const handleDelete = (refart: string) => {
-    deleteArticle(refart);
-  };
+  const handleDelete = (refart: string) => deleteArticle(refart);
 
   if (isLoading) {
-    return <div className="min-h-screen bg-background flex items-center justify-center">Chargement...</div>;
+    return (
+      <div className="min-h-screen bg-background flex items-center justify-center">
+        <div className="w-8 h-8 border-4 border-primary border-t-transparent rounded-full animate-spin" />
+      </div>
+    );
   }
 
   return (
-    <div className="min-h-screen bg-background">
-      <header className="bg-card border-b border-border sticky top-0 z-50 shadow-sm">
-        <div className="container mx-auto px-6 py-4 flex items-center justify-between">
-          <div className="flex items-center gap-3">
-            <Button variant="ghost" size="sm" onClick={() => navigate("/dashboard")}>
-              <ArrowLeft className="h-4 w-4" />
+    <div className="min-h-screen bg-background relative overflow-hidden">
+      <div className="fixed top-0 right-0 w-[500px] h-[500px] bg-accent/10 rounded-full blur-[150px] -translate-y-1/2 translate-x-1/3 pointer-events-none" />
+
+      <header className="sticky top-0 z-50 glass border-b border-border/30">
+        <div className="max-w-7xl mx-auto px-6 py-4 flex items-center justify-between">
+          <div className="flex items-center gap-4">
+            <Button variant="ghost" size="icon" onClick={() => navigate("/dashboard")} className="rounded-xl">
+              <ArrowLeft className="h-5 w-5" />
             </Button>
-            <Package className="h-6 w-6 text-primary" />
-            <h1 className="text-2xl font-bold text-foreground">Gestion des Articles</h1>
+            <div>
+              <h1 className="text-lg font-bold text-foreground">Articles</h1>
+              <p className="text-xs text-muted-foreground">{articles.length} produits</p>
+            </div>
           </div>
           <div className="flex items-center gap-3">
             <ThemeToggle />
-            <Button onClick={() => setIsDialogOpen(true)}>
+            <Button onClick={() => setIsDialogOpen(true)} className="rounded-xl bg-gradient-to-r from-primary to-accent glow-primary">
               <Plus className="h-4 w-4 mr-2" />
-              Nouvel Article
+              Nouveau
             </Button>
           </div>
         </div>
       </header>
 
-      <main className="container mx-auto px-6 py-8">
-        {/* Stats */}
-        <div className="grid grid-cols-1 md:grid-cols-4 gap-6 mb-8">
-          <Card>
-            <CardHeader className="flex flex-row items-center justify-between pb-2">
-              <CardTitle className="text-sm font-medium">Articles Actifs</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold">1,234</div>
-              <p className="text-xs text-muted-foreground">15 catégories</p>
-            </CardContent>
-          </Card>
-          <Card>
-            <CardHeader className="flex flex-row items-center justify-between pb-2">
-              <CardTitle className="text-sm font-medium">Valeur Stock</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold">245,890 €</div>
-              <p className="text-xs text-muted-foreground">Stock total</p>
-            </CardContent>
-          </Card>
-          <Card>
-            <CardHeader className="flex flex-row items-center justify-between pb-2">
-              <CardTitle className="text-sm font-medium">Ruptures</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold">5</div>
-              <p className="text-xs text-muted-foreground">Articles en rupture</p>
-            </CardContent>
-          </Card>
-          <Card>
-            <CardHeader className="flex flex-row items-center justify-between pb-2">
-              <CardTitle className="text-sm font-medium">Stock Bas</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold">23</div>
-              <p className="text-xs text-muted-foreground">Nécessitent réapprovisionnement</p>
-            </CardContent>
-          </Card>
+      <main className="max-w-7xl mx-auto px-6 py-8 relative">
+        <div className="relative mb-6">
+          <Search className="absolute left-4 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+          <Input
+            placeholder="Rechercher par référence, désignation ou catégorie..."
+            value={searchTerm}
+            onChange={(e) => setSearchTerm(e.target.value)}
+            className="pl-11 h-12 rounded-2xl glass border-border/50 focus:border-primary"
+          />
         </div>
 
-        <Card>
-          <CardHeader>
-            <div className="flex items-center justify-between">
-              <CardTitle>Catalogue Articles</CardTitle>
-              <div className="flex items-center gap-2 w-80">
-                <Search className="h-4 w-4 text-muted-foreground" />
-                <Input
-                  placeholder="Rechercher par référence, désignation ou catégorie..."
-                  value={searchTerm}
-                  onChange={(e) => setSearchTerm(e.target.value)}
-                />
-              </div>
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
+          {filteredArticles.length === 0 ? (
+            <div className="col-span-full glass rounded-2xl p-12 text-center">
+              <Package className="h-16 w-16 mx-auto mb-4 text-muted-foreground/30" />
+              <p className="text-muted-foreground">Aucun article trouvé</p>
             </div>
-          </CardHeader>
-          <CardContent>
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>Référence</TableHead>
-                  <TableHead>Désignation</TableHead>
-                  <TableHead>Prix Achat</TableHead>
-                  <TableHead>Prix Vente</TableHead>
-                  <TableHead>TVA</TableHead>
-                  <TableHead>Catégorie</TableHead>
-                  <TableHead>Stock</TableHead>
-                  <TableHead>État Stock</TableHead>
-                  <TableHead className="text-right">Actions</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {filteredArticles.map((article) => (
-                  <TableRow key={article.refart}>
-                    <TableCell className="font-medium">{article.refart}</TableCell>
-                    <TableCell>{article.designation}</TableCell>
-                    <TableCell>{article.prixa?.toFixed(2) || 0} €</TableCell>
-                    <TableCell className="font-semibold">{article.prixv?.toFixed(2) || 0} €</TableCell>
-                    <TableCell>{article.codetva}%</TableCell>
-                    <TableCell>
-                      <Badge variant="outline">{article.categorie}</Badge>
-                    </TableCell>
-                    <TableCell>{article.qtestk}</TableCell>
-                    <TableCell>{getStockBadge(article.qtestk || 0)}</TableCell>
-                    <TableCell className="text-right">
-                      <div className="flex justify-end gap-2">
-                        <Button variant="ghost" size="sm">
-                          <Edit className="h-4 w-4" />
-                        </Button>
-                        <Button variant="ghost" size="sm" onClick={() => handleDelete(article.refart)}>
-                          <Trash2 className="h-4 w-4 text-destructive" />
-                        </Button>
-                      </div>
-                    </TableCell>
-                  </TableRow>
-                ))}
-              </TableBody>
-            </Table>
-          </CardContent>
-        </Card>
-
-        {/* Règles de gestion */}
-        <Card className="mt-6 border-info">
-          <CardHeader>
-            <CardTitle className="text-info">Règles de Gestion</CardTitle>
-          </CardHeader>
-          <CardContent className="space-y-2 text-sm">
-            <p>• Le prix de vente doit toujours être supérieur au prix d'achat</p>
-            <p>• Un article ne peut être ajouté qu'une seule fois (unicité)</p>
-            <p>• Suppression logique si l'article est dans des commandes, physique sinon</p>
-            <p>• Modification possible: désignation, prix, TVA, catégorie uniquement</p>
-          </CardContent>
-        </Card>
+          ) : (
+            filteredArticles.map((article) => (
+              <div key={article.refart} className="glass rounded-2xl p-5 hover:shadow-lg transition-all group">
+                <div className="flex items-start justify-between mb-3">
+                  {getStockBadge(article.qtestk || 0)}
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    className="h-8 w-8 rounded-xl opacity-0 group-hover:opacity-100 transition-opacity hover:bg-destructive/10"
+                    onClick={() => handleDelete(article.refart)}
+                  >
+                    <Trash2 className="h-4 w-4 text-destructive" />
+                  </Button>
+                </div>
+                
+                <p className="font-mono text-sm text-primary mb-1">{article.refart}</p>
+                <p className="font-semibold text-foreground mb-2 line-clamp-2">{article.designation}</p>
+                
+                <div className="flex items-baseline justify-between mb-2">
+                  <p className="text-2xl font-bold text-foreground">{article.prixv?.toFixed(2)}€</p>
+                  <p className="text-sm text-muted-foreground">Achat: {article.prixa?.toFixed(2)}€</p>
+                </div>
+                
+                <div className="flex items-center justify-between text-xs text-muted-foreground">
+                  <Badge variant="outline" className="border-border/50">{article.categorie}</Badge>
+                  <span>{article.qtestk} en stock</span>
+                </div>
+              </div>
+            ))
+          )}
+        </div>
       </main>
 
       <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
-        <DialogContent className="max-w-2xl">
+        <DialogContent className="glass-strong rounded-3xl border-border/50 max-w-xl">
           <DialogHeader>
-            <DialogTitle>Nouvel Article</DialogTitle>
-            <DialogDescription>
-              Ajouter un nouvel article au catalogue
-            </DialogDescription>
+            <DialogTitle className="text-xl font-bold">Nouvel Article</DialogTitle>
           </DialogHeader>
           <Form {...form}>
             <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
@@ -256,9 +166,9 @@ const Articles = () => {
                   name="refart"
                   render={({ field }) => (
                     <FormItem>
-                      <FormLabel>Référence</FormLabel>
+                      <FormLabel className="text-muted-foreground">Référence</FormLabel>
                       <FormControl>
-                        <Input placeholder="ART001" {...field} />
+                        <Input placeholder="ART001" {...field} className="h-11 rounded-xl bg-secondary/50 border-border/50" />
                       </FormControl>
                       <FormMessage />
                     </FormItem>
@@ -269,9 +179,9 @@ const Articles = () => {
                   name="categorie"
                   render={({ field }) => (
                     <FormItem>
-                      <FormLabel>Catégorie</FormLabel>
+                      <FormLabel className="text-muted-foreground">Catégorie</FormLabel>
                       <FormControl>
-                        <Input placeholder="Informatique" {...field} />
+                        <Input placeholder="Informatique" {...field} className="h-11 rounded-xl bg-secondary/50 border-border/50" />
                       </FormControl>
                       <FormMessage />
                     </FormItem>
@@ -283,9 +193,9 @@ const Articles = () => {
                 name="designation"
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel>Désignation</FormLabel>
+                    <FormLabel className="text-muted-foreground">Désignation</FormLabel>
                     <FormControl>
-                      <Input placeholder="Ordinateur Portable HP" {...field} />
+                      <Input placeholder="Ordinateur Portable HP" {...field} className="h-11 rounded-xl bg-secondary/50 border-border/50" />
                     </FormControl>
                     <FormMessage />
                   </FormItem>
@@ -297,9 +207,9 @@ const Articles = () => {
                   name="prixa"
                   render={({ field }) => (
                     <FormItem>
-                      <FormLabel>Prix Achat (€)</FormLabel>
+                      <FormLabel className="text-muted-foreground">Prix Achat €</FormLabel>
                       <FormControl>
-                        <Input type="number" step="0.01" {...field} />
+                        <Input type="number" step="0.01" {...field} className="h-11 rounded-xl bg-secondary/50 border-border/50" />
                       </FormControl>
                       <FormMessage />
                     </FormItem>
@@ -310,9 +220,9 @@ const Articles = () => {
                   name="prixv"
                   render={({ field }) => (
                     <FormItem>
-                      <FormLabel>Prix Vente (€)</FormLabel>
+                      <FormLabel className="text-muted-foreground">Prix Vente €</FormLabel>
                       <FormControl>
-                        <Input type="number" step="0.01" {...field} />
+                        <Input type="number" step="0.01" {...field} className="h-11 rounded-xl bg-secondary/50 border-border/50" />
                       </FormControl>
                       <FormMessage />
                     </FormItem>
@@ -323,9 +233,9 @@ const Articles = () => {
                   name="codetva"
                   render={({ field }) => (
                     <FormItem>
-                      <FormLabel>TVA (%)</FormLabel>
+                      <FormLabel className="text-muted-foreground">TVA %</FormLabel>
                       <FormControl>
-                        <Input type="number" {...field} />
+                        <Input type="number" {...field} className="h-11 rounded-xl bg-secondary/50 border-border/50" />
                       </FormControl>
                       <FormMessage />
                     </FormItem>
@@ -337,19 +247,21 @@ const Articles = () => {
                 name="qtestk"
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel>Quantité en Stock</FormLabel>
+                    <FormLabel className="text-muted-foreground">Quantité en Stock</FormLabel>
                     <FormControl>
-                      <Input type="number" {...field} />
+                      <Input type="number" {...field} className="h-11 rounded-xl bg-secondary/50 border-border/50" />
                     </FormControl>
                     <FormMessage />
                   </FormItem>
                 )}
               />
-              <div className="flex justify-end gap-2">
-                <Button type="button" variant="outline" onClick={() => setIsDialogOpen(false)}>
+              <div className="flex gap-3 pt-4">
+                <Button type="button" variant="ghost" onClick={() => setIsDialogOpen(false)} className="flex-1 h-12 rounded-xl">
                   Annuler
                 </Button>
-                <Button type="submit">Ajouter</Button>
+                <Button type="submit" className="flex-1 h-12 rounded-xl bg-gradient-to-r from-primary to-accent glow-primary">
+                  Ajouter
+                </Button>
               </div>
             </form>
           </Form>
