@@ -32,6 +32,7 @@ import {
 } from "@/components/ui/form";
 import { ArrowLeft, Plus, Search, Edit, Trash2, Package } from "lucide-react";
 import { useArticles } from "@/hooks/useArticles";
+import { ThemeToggle } from "@/components/ThemeToggle";
 
 const articleSchema = z.object({
   refart: z.string().min(1, "Référence obligatoire"),
@@ -115,10 +116,13 @@ const Articles = () => {
             <Package className="h-6 w-6 text-primary" />
             <h1 className="text-2xl font-bold text-foreground">Gestion des Articles</h1>
           </div>
-          <Button onClick={() => setIsDialogOpen(true)}>
-            <Plus className="h-4 w-4 mr-2" />
-            Nouvel Article
-          </Button>
+          <div className="flex items-center gap-3">
+            <ThemeToggle />
+            <Button onClick={() => setIsDialogOpen(true)}>
+              <Plus className="h-4 w-4 mr-2" />
+              Nouvel Article
+            </Button>
+          </div>
         </div>
       </header>
 
